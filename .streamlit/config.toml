@@ -1,0 +1,10 @@
+[theme]
+base="light"
+primaryColor="#0A84FF"
+backgroundColor="#FFFFFF"
+secondaryBackgroundColor="#F4F8FF"
+textColor="#1E293B"
+font="sans serif"
+
+[client]
+toolbarMode="viewer"

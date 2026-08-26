@@ -37,6 +37,11 @@ st.markdown("""
         direction: ltr !important;
         -webkit-font-smoothing: antialiased !important;
     }
+    /* アプリ全体をライトモード（純白背景）で完全固定 */
+    html, body, [data-testid="stAppViewContainer"], .stApp {
+        background-color: #FFFFFF !important;
+        color: #1E293B !important;
+    }
     /* Streamlit標準のDeployボタン・右上の三本点メニュー・ヘッダー・フッターを完全非表示 */
     #MainMenu,
     header,
