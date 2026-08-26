@@ -1998,21 +1998,23 @@ def main():
                             for zname in z.namelist():
                                 if zname.lower().endswith('.xlsx') and not zname.startswith('__MACOSX/'):
                                     zbytes = z.read(zname)
-                                    wb_in = openpyxl.load_workbook(filename=io.BytesIO(zbytes), data_only=True)
+                                    wb_in = openpyxl.load_workbook(filename=io.BytesIO(zbytes), read_only=True)
                                     for sheetname in wb_in.sheetnames:
                                         all_sheets_data.append({
                                             'file_name': f"{file_item.name} > {zname}",
                                             'bytes_data': zbytes,
                                             'sheet_name': sheetname
                                         })
+                                    wb_in.close()
                     else:
-                        wb_in = openpyxl.load_workbook(filename=io.BytesIO(bytes_data), data_only=True)
+                        wb_in = openpyxl.load_workbook(filename=io.BytesIO(bytes_data), read_only=True)
                         for sheetname in wb_in.sheetnames:
                             all_sheets_data.append({
                                 'file_name': file_item.name,
                                 'bytes_data': bytes_data,
                                 'sheet_name': sheetname
                             })
+                        wb_in.close()
                 except Exception as e:
                     st.warning(f"⚠️ ファイル `{file_item.name}` の読み込みに失敗しました: {e}")
                     
