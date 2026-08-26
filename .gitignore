@@ -1,0 +1,21 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Mac OS
+.DS_Store
+
+# Streamlit logs
+*.log
+
+# Temporary test excel files (only keep standard master templates)
+*.xlsx
+!基準様式　鍼.xlsx
+!基準様式　マ.xlsx
+
+# Exclude standalone test python scripts
+test_*.py
+generate_*.py
+revert_*.py
+converter_logic.py
