@@ -986,6 +986,43 @@ def detect_acupuncture_diseases(ws, img_coords):
     return diseases
 
 
+def detect_first_exam_fee(spot_ws, img_coords):
+    """初検料（１はり ２きゅう ３はりきゅう併用）の選択肢および金額を動的判定"""
+    r_found = None
+    for r in range(60, 80):
+        for c in range(1, 20):
+            v = str(spot_ws.cell(row=r, column=c).value or '')
+            if '初検' in v:
+                r_found = r
+                break
+        if r_found:
+            break
+            
+    if not r_found:
+        return {'text': '初検料（１はり　２きゅう　３はりきゅう併用）', 'price': ''}
+        
+    price_val = None
+    for c in range(25, 60):
+        v = spot_ws.cell(row=r_found, column=c).value
+        if v is not None and str(v).strip().isdigit() and int(str(v).strip()) > 0:
+            price_val = int(str(v).strip())
+            break
+            
+    opt1, opt2, opt3 = False, False, False
+    for c in range(1, spot_ws.max_column + 1):
+        v = str(spot_ws.cell(row=r_found, column=c).value or '')
+        if '①' in v or '○1' in v or '○１' in v or '1はり' in v: opt1 = True
+        if '②' in v or '○2' in v or '○２' in v or '2きゅう' in v: opt2 = True
+        if '③' in v or '○3' in v or '○３' in v or '併用' in v: opt3 = True
+        
+    s1 = '①はり' if opt1 else '１はり'
+    s2 = '②きゅう' if opt2 else '２きゅう'
+    s3 = '③はりきゅう併用' if opt3 else '３はりきゅう併用'
+    
+    text = f'初検料（{s1}　{s2}　{s3}）'
+    return {'text': text, 'price': f'{price_val:,}' if price_val else ''}
+
+
 def extract_header_data_dynamic(spot_ws):
     """保険者番号・被保険者記号番号・発病年月日・原因経過・氏名・フリガナ・性別・続柄を行ズレに関わらず動的抽出"""
     # 1. 保険者番号 (8桁マス目用数字リスト)
@@ -1366,6 +1403,12 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     target_ws["AE77"] = dis_res['d5']
     target_ws["AX77"] = dis_res['d6']
     target_ws["BW77"] = dis_res['d7']
+
+    # 初検料（動的判定）
+    fe_res = detect_first_exam_fee(spot_ws, img_coords)
+    target_ws["J82"] = fe_res['text']
+    if fe_res['price']:
+        target_ws["BF82"] = f"{fe_res['price']} 円"
 
     # 施術の種類 (1術・2術 回数)
     if spot_ws["AT73"].value: target_ws["BW87"] = f"１術 {spot_ws['AT73'].value}"
