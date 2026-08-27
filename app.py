@@ -934,53 +934,175 @@ def detect_payment_section(ws, img_coords):
 
 
 def detect_acupuncture_diseases(ws, img_coords):
-    """はり・きゅうの傷病名を動的判定（複数選択に完全対応）"""
+    """はり・きゅうの傷病名を動的判定（複数選択に完全対応・①.形式で配置）"""
     diseases = {
-        'd1': '１．神経痛',
-        'd2': '２．リウマチ',
-        'd3': '３．頸腕症候群',
-        'd4': '４．五十肩',
-        'd5': '５．腰痛症',
-        'd6': '６．頸椎捻挫後遺症',
-        'd7': '７．その他（　　　　　　　　　）'
+        'd1': '1. 神経痛',
+        'd2': '2. リウマチ',
+        'd3': '3. 頸腕症候群',
+        'd4': '4. 五十肩',
+        'd5': '5. 腰痛症',
+        'd6': '6. 頸椎捻挫後遺症',
+        'd7': '7. その他（　　　　　　　　　）'
     }
     
     for (r, c) in img_coords:
         if 58 <= r <= 68:
             if 14 <= c <= 22:
-                if r <= 63: diseases['d1'] = '○１．神経痛'
-                else: diseases['d5'] = '○５．腰痛症'
+                if r <= 63: diseases['d1'] = '①. 神経痛'
+                else: diseases['d5'] = '⑤. 腰痛症'
             elif 23 <= c <= 35:
-                if r <= 63: diseases['d2'] = '○２．リウマチ'
-                else: diseases['d6'] = '○６．頸椎捻挫後遺症'
+                if r <= 63: diseases['d2'] = '②. リウマチ'
+                else: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
             elif 36 <= c <= 46:
-                if r <= 63: diseases['d3'] = '○３．頸腕症候群'
-                else: diseases['d7'] = '○７．その他（　　　　　　　　　）'
+                if r <= 63: diseases['d3'] = '③. 頸腕症候群'
+                else: diseases['d7'] = '⑦. その他（　　　　　　　　　）'
             elif 47 <= c <= 58:
-                if r <= 63: diseases['d4'] = '○４．五十肩'
+                if r <= 63: diseases['d4'] = '④. 五十肩'
 
-    for r in [61, 65]:
-        for c in range(15, ws.max_column + 1):
+    for r in range(55, 70):
+        for c in range(10, ws.max_column + 1):
             v = str(ws.cell(row=r, column=c).value or '')
-            if '○' in v or '●' in v or '◎' in v:
-                if '神経痛' in v: diseases['d1'] = '○１．神経痛'
-                if 'リウマチ' in v: diseases['d2'] = '○２．リウマチ'
-                if '頸腕' in v: diseases['d3'] = '○３．頸腕症候群'
-                if '五十肩' in v: diseases['d4'] = '○４．五十肩'
-                if '腰痛' in v: diseases['d5'] = '○５．腰痛症'
-                if '頸椎' in v: diseases['d6'] = '○６．頸椎捻挫後遺症'
-                if 'その他' in v: diseases['d7'] = '○７．その他（　　　　　　　　　）'
+            if any(m in v for m in ['○', '●', '◎', '①', '②', '③', '④', '⑤', '⑥', '⑦']):
+                if '神経痛' in v: diseases['d1'] = '①. 神経痛'
+                if 'リウマチ' in v: diseases['d2'] = '②. リウマチ'
+                if '頸腕' in v: diseases['d3'] = '③. 頸腕症候群'
+                if '五十肩' in v: diseases['d4'] = '④. 五十肩'
+                if '腰痛' in v: diseases['d5'] = '⑤. 腰痛症'
+                if '頸椎' in v: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
+                if 'その他' in v: diseases['d7'] = '⑦. その他（　　　　　　　　　）'
 
-    am32_val = str(ws['AM32'].value or '')
-    if am32_val:
-        if '神経痛' in am32_val: diseases['d1'] = '○１．神経痛'
-        if 'リウマチ' in am32_val: diseases['d2'] = '○２．リウマチ'
-        if '頸腕' in am32_val: diseases['d3'] = '○３．頸腕症候群'
-        if '五十肩' in am32_val: diseases['d4'] = '○４．五十肩'
-        if '腰痛' in am32_val: diseases['d5'] = '○５．腰痛症'
-        if '頸椎' in am32_val: diseases['d6'] = '○６．頸椎捻挫後遺症'
+    # 上部の傷病名欄テキストからも補助検知
+    for r in range(25, 40):
+        for c in range(20, min(ws.max_column + 1, 60)):
+            v = str(ws.cell(row=r, column=c).value or '')
+            if any(k in v for k in ['神経痛', '五十肩', '腰痛', 'リウマチ', '頸腕', '頸椎']):
+                if '神経痛' in v: diseases['d1'] = '①. 神経痛'
+                if 'リウマチ' in v: diseases['d2'] = '②. リウマチ'
+                if '頸腕' in v: diseases['d3'] = '③. 頸腕症候群'
+                if '五十肩' in v: diseases['d4'] = '④. 五十肩'
+                if '腰痛' in v: diseases['d5'] = '⑤. 腰痛症'
+                if '頸椎' in v: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
         
     return diseases
+
+
+def extract_header_data_dynamic(spot_ws):
+    """保険者番号・被保険者記号番号・発病年月日・原因経過・氏名・フリガナ・性別・続柄を行ズレに関わらず動的抽出"""
+    # 1. 保険者番号 (8桁マス目用数字リスト)
+    ins_digits = []
+    for r in range(15, 32):
+        for c in range(20, spot_ws.max_column + 1):
+            v = str(spot_ws.cell(row=r, column=c).value or '')
+            if '保険者番号' in v.replace(' ', ''):
+                for col_k in range(c + 1, min(spot_ws.max_column + 1, c + 45)):
+                    cv = spot_ws.cell(row=r, column=col_k).value
+                    if cv is not None:
+                        digits = re.findall(r'\d', str(cv))
+                        ins_digits.extend(digits)
+                break
+        if ins_digits:
+            break
+
+    # 2. 記号番号, 発病負傷, 原因経過
+    kigou, hatsubyou, genin = None, None, None
+    for r in range(25, 38):
+        for c in range(1, spot_ws.max_column + 1):
+            v = str(spot_ws.cell(row=r, column=c).value or '')
+            clean_v = v.replace(' ', '').replace('\n', '')
+            if '被保険者' in clean_v and ('記号' in clean_v or '番号' in clean_v):
+                for ro in range(r + 1, r + 5):
+                    cv = spot_ws.cell(row=ro, column=c).value or spot_ws.cell(row=ro, column=c + 3).value
+                    if cv:
+                        kigou = str(cv).strip()
+                        break
+            if '発病' in clean_v or '負傷年月日' in clean_v:
+                for ro in range(r + 1, r + 5):
+                    cv = spot_ws.cell(row=ro, column=c).value or spot_ws.cell(row=ro, column=c + 3).value
+                    if cv:
+                        hatsubyou = str(cv).strip()
+                        break
+            if '原因及びその経過' in clean_v or '原因及び経過' in clean_v or '発症又は負傷' in clean_v:
+                for ro in range(r + 1, r + 5):
+                    cv = spot_ws.cell(row=ro, column=c).value or spot_ws.cell(row=ro, column=c + 3).value
+                    if cv:
+                        genin = str(cv).strip()
+                        break
+
+    # 3. 氏名, フリガナ, 性別, 続柄
+    kana, name, gender, relation = None, None, None, None
+    for r in range(32, 48):
+        for c in range(1, spot_ws.max_column + 1):
+            v = str(spot_ws.cell(row=r, column=c).value or '')
+            if '(ﾌﾘｶﾞﾅ)' in v or 'フリガナ' in v:
+                for co in range(c + 1, c + 15):
+                    cv = spot_ws.cell(row=r, column=co).value
+                    if cv and str(cv).strip():
+                        kana = str(cv).strip()
+                        break
+                for ro in range(r + 1, r + 5):
+                    for co in range(c - 2, c + 15):
+                        cv = spot_ws.cell(row=ro, column=co).value
+                        if cv and len(str(cv).strip()) >= 2 and not any(k in str(cv) for k in ['男', '女', '本人', '家族', '続柄']):
+                            name = str(cv).strip()
+                            break
+                    if name:
+                        break
+            if '続柄' in v.replace(' ', ''):
+                for ro in range(r + 1, r + 5):
+                    for co in range(c - 2, c + 5):
+                        cv = spot_ws.cell(row=ro, column=co).value
+                        if cv and any(k in str(cv) for k in ['本人', '家族', '妻', '夫', '子', '父', '母']):
+                            relation = str(cv).strip()
+                            break
+                    if relation:
+                        break
+            if v in ['男', '女']:
+                gender = v
+
+    return {
+        'ins_digits': ins_digits,
+        'kigou': kigou,
+        'hatsubyou': hatsubyou,
+        'genin': genin,
+        'kana': kana,
+        'name': name,
+        'gender': gender,
+        'relation': relation
+    }
+
+
+def extract_calendar_marks_dynamic(spot_ws):
+    """カレンダーの「1〜31」日付行と各日の丸印（①〜⑤、○、●、◎）を行ズレに関わらず動的抽出"""
+    cal_data = {}
+    day_row = None
+    col_day_map = {}
+    
+    # 1. 「1〜31」の日付が並ぶ行を自動探索
+    for r in range(140, 200):
+        found_days = {}
+        for c in range(10, min(spot_ws.max_column + 1, 90)):
+            v = spot_ws.cell(row=r, column=c).value
+            if v is not None and str(v).strip().isdigit():
+                d = int(str(v).strip())
+                if 1 <= d <= 31:
+                    found_days[c] = d
+        if len(found_days) >= 10:
+            day_row = r
+            col_day_map = found_days
+            break
+            
+    # 2. 日付行の下の行をスキャンして丸印を抽出
+    if day_row:
+        for r in range(day_row + 1, min(spot_ws.max_row + 1, day_row + 10)):
+            for c, d in col_day_map.items():
+                if d not in cal_data:
+                    v = spot_ws.cell(row=r, column=c).value
+                    if v and str(v).strip() in ['①', '②', '③', '④', '⑤', '◎', '○', '●', '1', '2', '3', '4', '5']:
+                        mark_str = str(v).strip()
+                        num_to_enc = {'1': '①', '2': '②', '3': '③', '4': '④', '5': '⑤'}
+                        cal_data[d] = num_to_enc.get(mark_str, mark_str)
+                        
+    return cal_data
 
 
 def extract_treatment_location(ws):
@@ -1166,40 +1288,40 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     target_ws["EM18"] = marks['rate_9']
     target_ws["ES18"] = marks['rate_10']
 
+    # 1. ヘッダー・被保険者欄（完全動的抽出）
+    h_data = extract_header_data_dynamic(spot_ws)
+
     # 保険者番号 (8桁個別ボックス: 右詰めで配置)
-    digits = []
-    for c in range(40, spot_ws.max_column + 1):
-        v = spot_ws.cell(row=24, column=c).value
-        if v is not None and str(v).strip().isdigit():
-            digits.append(str(v).strip())
-            
     box_cols = ["DC28", "DI28", "DO28", "DU28", "EA28", "EG28", "EM28", "ES28"]
     for col in box_cols:
         target_ws[col] = None
-        
-    if digits:
-        digs = digits[-8:] if len(digits) > 8 else digits
+    if h_data['ins_digits']:
+        digs = h_data['ins_digits'][-8:] if len(h_data['ins_digits']) > 8 else h_data['ins_digits']
         start_idx = len(box_cols) - len(digs)
         for i, d in enumerate(digs):
             target_ws[box_cols[start_idx + i]] = str(d)
 
-    # 被保険者欄
-    if spot_ws["F32"].value: target_ws["J38"] = str(spot_ws["F32"].value)
-    if spot_ws["Y32"].value:
-        target_ws["AU38"] = str(spot_ws["Y32"].value)
+    # 被保険者記号番号, 発病年月日, 原因経過
+    if h_data['kigou']:
+        target_ws["J38"] = str(h_data['kigou'])
+    if h_data['hatsubyou']:
+        target_ws["AU38"] = str(h_data['hatsubyou'])
         target_ws["AU38"].alignment = Alignment(horizontal="center", vertical="center")
-        
-    # 疾病名・原因・経過 (不要な改行を除去して綺麗に左寄せ)
-    if spot_ws["AM32"].value:
-        clean_cause = re.sub(r'[\r\n]+', '', str(spot_ws["AM32"].value)).strip()
+    if h_data['genin']:
+        clean_cause = re.sub(r'[\r\n]+', '', str(h_data['genin'])).strip()
         target_ws["BX38"] = clean_cause
         target_ws["BX38"].alignment = Alignment(wrap_text=True, vertical="center", horizontal="left")
         target_ws["BX38"].font = Font(name="ＭＳ 明朝", size=9)
         
-    if spot_ws["U37"].value: target_ws["AC43"] = f"(ﾌﾘｶﾞﾅ) {spot_ws['U37'].value}"
-    if spot_ws["O40"].value: target_ws["AC47"] = str(spot_ws["O40"].value)
-    target_ws["BQ47"] = "○男・女" if spot_ws["AH40"].value == "男" else "男・○女"
-    if spot_ws["AK40"].value: target_ws["BW47"] = str(spot_ws["AK40"].value)
+    # フリガナ, 氏名, 性別, 続柄
+    if h_data['kana']:
+        target_ws["AC43"] = f"(ﾌﾘｶﾞﾅ) {h_data['kana']}"
+    if h_data['name']:
+        target_ws["AC47"] = str(h_data['name'])
+    if h_data['gender']:
+        target_ws["BQ47"] = "○男・女" if h_data['gender'] == "男" else "男・○女"
+    if h_data['relation']:
+        target_ws["BW47"] = str(h_data['relation'])
     
     # 施術した場所 (CJ52 & CJ57: 長文でもはみ出さない自動縮小＋折り返し)
     loc_text = extract_treatment_location(spot_ws)
@@ -1314,18 +1436,14 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
         target_ws["DO87"].alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
         target_ws["DO87"].font = Font(name="ＭＳ 明朝", size=9)
 
-    # カレンダー (Row 168: 中央揃えで配置)
-    for c in range(17, spot_ws.max_column + 1):
-        for r in [162, 163, 164, 165]:
-            mark = spot_ws.cell(row=r, column=c).value
-            if mark and str(mark).strip() in ["①", "②", "③", "④", "⑤", "◎", "○", "●"]:
-                day_num = spot_ws.cell(row=157, column=c).value
-                if day_num and str(day_num).isdigit():
-                    d = int(day_num)
-                    cal_col_idx = 30 + (d - 1) * 4
-                    cell = target_ws.cell(row=168, column=cal_col_idx, value=str(mark))
-                    cell.alignment = Alignment(horizontal="center", vertical="center")
-                    cell.font = Font(name="ＭＳ 明朝", size=11, bold=True)
+    # カレンダー (Row 168: 中央揃えで動的配置)
+    cal_data = extract_calendar_marks_dynamic(spot_ws)
+    for d, mark in cal_data.items():
+        if 1 <= d <= 31:
+            cal_col_idx = 30 + (d - 1) * 4
+            cell = target_ws.cell(row=168, column=cal_col_idx, value=str(mark))
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.font = Font(name="ＭＳ 明朝", size=11, bold=True)
 
     # 往療又は訪問の理由 (動的複数選択対応)
     target_ws["J173"] = detect_visit_reasons(spot_ws, img_coords)
@@ -1404,7 +1522,7 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     
     # 口座番号 (8マス: 右詰めで配置)
     acc_boxes = ["CG220", "CL220", "CQ220", "CV220", "DA220", "DF220", "DK220", "DP220"]
-    for col in box_cols:
+    for col in acc_boxes:
         target_ws[col] = None
         
     acc_digits = []
@@ -1414,7 +1532,7 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
             acc_digits.append(str(v).strip())
             
     if acc_digits:
-        digs = acc_digits[-8:] if len(digits) > 8 else acc_digits
+        digs = acc_digits[-8:] if len(acc_digits) > 8 else acc_digits
         start_idx = len(acc_boxes) - len(digs)
         for i, d in enumerate(digs):
             target_ws[acc_boxes[start_idx + i]] = str(d)
@@ -1518,40 +1636,40 @@ def convert_massage_dynamic(spot_ws, target_ws):
     target_ws["EM18"] = marks['rate_9']
     target_ws["ES18"] = marks['rate_10']
 
+    # 1. ヘッダー・被保険者欄（完全動的抽出）
+    h_data = extract_header_data_dynamic(spot_ws)
+
     # 保険者番号 (8桁個別ボックス: 右詰めで配置)
-    digits = []
-    for c in range(40, spot_ws.max_column + 1):
-        v = spot_ws.cell(row=24, column=c).value
-        if v is not None and str(v).strip().isdigit():
-            digits.append(str(v).strip())
-            
     box_cols = ["DC28", "DI28", "DO28", "DU28", "EA28", "EG28", "EM28", "ES28"]
     for col in box_cols:
         target_ws[col] = None
-        
-    if digits:
-        digs = digits[-8:] if len(digits) > 8 else digits
+    if h_data['ins_digits']:
+        digs = h_data['ins_digits'][-8:] if len(h_data['ins_digits']) > 8 else h_data['ins_digits']
         start_idx = len(box_cols) - len(digs)
         for i, d in enumerate(digs):
             target_ws[box_cols[start_idx + i]] = str(d)
 
-    # 被保険者欄
-    if spot_ws["F32"].value: target_ws["J38"] = str(spot_ws["F32"].value)
-    if spot_ws["Y32"].value:
-        target_ws["AU38"] = str(spot_ws["Y32"].value)
+    # 被保険者記号番号, 発病年月日, 原因経過
+    if h_data['kigou']:
+        target_ws["J38"] = str(h_data['kigou'])
+    if h_data['hatsubyou']:
+        target_ws["AU38"] = str(h_data['hatsubyou'])
         target_ws["AU38"].alignment = Alignment(horizontal="center", vertical="center")
-        
-    # 疾病名・原因・経過 (不要な改行を除去して綺麗に左寄せ)
-    if spot_ws["AM32"].value:
-        clean_cause = re.sub(r'[\r\n]+', '', str(spot_ws["AM32"].value)).strip()
+    if h_data['genin']:
+        clean_cause = re.sub(r'[\r\n]+', '', str(h_data['genin'])).strip()
         target_ws["BX38"] = clean_cause
         target_ws["BX38"].alignment = Alignment(wrap_text=True, vertical="center", horizontal="left")
         target_ws["BX38"].font = Font(name="ＭＳ 明朝", size=9)
         
-    if spot_ws["U37"].value: target_ws["AC43"] = f"(ﾌﾘｶﾞﾅ) {spot_ws['U37'].value}"
-    if spot_ws["O40"].value: target_ws["AC47"] = str(spot_ws["O40"].value)
-    target_ws["BQ47"] = "○男・女" if spot_ws["AH40"].value == "男" else "男・○女"
-    if spot_ws["AK40"].value: target_ws["BW47"] = str(spot_ws["AK40"].value)
+    # フリガナ, 氏名, 性別, 続柄
+    if h_data['kana']:
+        target_ws["AC43"] = f"(ﾌﾘｶﾞﾅ) {h_data['kana']}"
+    if h_data['name']:
+        target_ws["AC47"] = str(h_data['name'])
+    if h_data['gender']:
+        target_ws["BQ47"] = "○男・女" if h_data['gender'] == "男" else "男・○女"
+    if h_data['relation']:
+        target_ws["BW47"] = str(h_data['relation'])
     
     # 施術した場所 (CJ52 & CJ57: 長文でもはみ出さない自動縮小＋折り返し)
     loc_text = extract_treatment_location(spot_ws)
@@ -1683,18 +1801,14 @@ def convert_massage_dynamic(spot_ws, target_ws):
         target_ws["DO87"].alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
         target_ws["DO87"].font = Font(name="ＭＳ 明朝", size=9)
 
-    # カレンダー (Row 172: 中央揃えで配置)
-    for c in range(17, spot_ws.max_column + 1):
-        for r in [172, 173, 174, 175, 176]:
-            mark = spot_ws.cell(row=r, column=c).value
-            if mark and str(mark).strip() in ["①", "②", "③", "④", "⑤", "◎", "○", "●"]:
-                day_num = spot_ws.cell(row=170, column=c).value
-                if day_num and str(day_num).isdigit():
-                    d = int(day_num)
-                    cal_col_idx = 30 + (d - 1) * 4
-                    cell = target_ws.cell(row=172, column=cal_col_idx, value=str(mark))
-                    cell.alignment = Alignment(horizontal="center", vertical="center")
-                    cell.font = Font(name="ＭＳ 明朝", size=11, bold=True)
+    # カレンダー (Row 172: 中央揃えで動的配置)
+    cal_data = extract_calendar_marks_dynamic(spot_ws)
+    for d, mark in cal_data.items():
+        if 1 <= d <= 31:
+            cal_col_idx = 30 + (d - 1) * 4
+            cell = target_ws.cell(row=172, column=cal_col_idx, value=str(mark))
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.font = Font(name="ＭＳ 明朝", size=11, bold=True)
 
     # 往療又は訪問の理由 (動的複数選択対応)
     target_ws["J177"] = detect_visit_reasons(spot_ws, img_coords)
@@ -1779,7 +1893,7 @@ def convert_massage_dynamic(spot_ws, target_ws):
             acc_digits.append(str(v).strip())
             
     if acc_digits:
-        digs = acc_digits[-8:] if len(digits) > 8 else acc_digits
+        digs = acc_digits[-8:] if len(acc_digits) > 8 else acc_digits
         start_idx = len(acc_boxes) - len(digs)
         for i, d in enumerate(digs):
             target_ws[acc_boxes[start_idx + i]] = str(d)
