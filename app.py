@@ -706,8 +706,24 @@ def detect_work_injury(ws, img_coords):
 
 def detect_claim_type(ws, img_coords):
     """請求区分（新規・継続）を動的判定"""
-    is_new = any((r, c) in img_coords for r in range(52, 59) for c in range(60, 69))
-    is_cont = any((r, c) in img_coords for r in range(52, 59) for c in range(70, 78))
+    r_claim = None
+    for r in range(40, 80):
+        for c in range(50, ws.max_column + 1):
+            v = str(ws.cell(row=r, column=c).value or '').replace(' ', '')
+            if '請求区分' in v or '新規' in v or '継続' in v:
+                r_claim = r
+                break
+        if r_claim: break
+    if not r_claim: r_claim = 53
+
+    is_new = any((r, c) in img_coords for r in range(r_claim - 1, r_claim + 6) for c in range(60, 69))
+    is_cont = any((r, c) in img_coords for r in range(r_claim - 1, r_claim + 6) for c in range(70, 78))
+    for r in range(r_claim, r_claim + 5):
+        for c in range(55, ws.max_column + 1):
+            v = str(ws.cell(row=r, column=c).value or '')
+            if '○新規' in v or '●新規' in v or '①新規' in v: is_new = True
+            if '○継続' in v or '●継続' in v or '②継続' in v: is_cont = True
+
     if is_new:
         return "○新規・継続"
     elif is_cont:
@@ -717,10 +733,27 @@ def detect_claim_type(ws, img_coords):
 
 def detect_outcome(ws, img_coords):
     """転帰（継続・治癒・中止・転医）を動的判定"""
-    is_cont = any((r, c) in img_coords for r in range(60, 68) for c in range(60, 66))
-    is_cure = any((r, c) in img_coords for r in range(60, 68) for c in range(67, 72))
-    is_stop = any((r, c) in img_coords for r in range(60, 68) for c in range(73, 78))
-    is_trans = any((r, c) in img_coords for r in range(60, 68) for c in range(79, 85))
+    r_out = None
+    for r in range(50, 90):
+        for c in range(50, ws.max_column + 1):
+            v = str(ws.cell(row=r, column=c).value or '').replace(' ', '')
+            if '転帰' in v or '治癒' in v or '中止' in v or '転医' in v:
+                r_out = r
+                break
+        if r_out: break
+    if not r_out: r_out = 61
+
+    is_cont = any((r, c) in img_coords for r in range(r_out - 1, r_out + 6) for c in range(60, 66))
+    is_cure = any((r, c) in img_coords for r in range(r_out - 1, r_out + 6) for c in range(67, 72))
+    is_stop = any((r, c) in img_coords for r in range(r_out - 1, r_out + 6) for c in range(73, 78))
+    is_trans = any((r, c) in img_coords for r in range(r_out - 1, r_out + 6) for c in range(79, 85))
+    for r in range(r_out, r_out + 5):
+        for c in range(55, ws.max_column + 1):
+            v = str(ws.cell(row=r, column=c).value or '')
+            if '○治癒' in v or '●治癒' in v: is_cure = True
+            if '○中止' in v or '●中止' in v: is_stop = True
+            if '○転医' in v or '●転医' in v: is_trans = True
+
     if is_cure:
         return "継続・○治癒・中止・転医"
     elif is_stop:
@@ -773,7 +806,23 @@ def detect_visit_reasons(ws, img_coords):
 
 def detect_practitioner_location_type(ws, img_coords):
     """施術証明欄の「1.施術所所在地」「2.出張専門施術者住所地」を動的判定"""
-    is_house_call = any((r, c) in img_coords for r in range(168, 186) for c in range(60, 75))
+    r_cert = None
+    for r in range(140, 220):
+        for c in range(1, 15):
+            v = str(ws.cell(row=r, column=c).value or '').replace(' ', '')
+            if '施術証明' in v or '上記のとおり' in v:
+                r_cert = r
+                break
+        if r_cert: break
+    if not r_cert: r_cert = 170
+
+    is_house_call = any((r, c) in img_coords for r in range(r_cert, r_cert + 15) for c in range(60, 80))
+    for r in range(r_cert, r_cert + 10):
+        for c in range(40, ws.max_column + 1):
+            v = str(ws.cell(row=r, column=c).value or '')
+            if '②.出張専門' in v or '○2.出張専門' in v or '●2.出張専門' in v or '②出張専門' in v:
+                is_house_call = True
+
     if is_house_call:
         return "1.施術所所在地　②.出張専門施術者住所地"
     return "①.施術所所在地　2.出張専門施術者住所地"
@@ -980,21 +1029,31 @@ def detect_acupuncture_diseases(ws, img_coords):
         'd7': '7. その他（　　　　　　　　　）'
     }
     
+    r_dis = None
+    for r in range(50, 85):
+        for c in range(1, 20):
+            v = str(ws.cell(row=r, column=c).value or '').replace(' ', '')
+            if '神経痛' in v or 'リウマチ' in v or '傷病名' in v:
+                r_dis = r
+                break
+        if r_dis: break
+    if not r_dis: r_dis = 58
+
     for (r, c) in img_coords:
-        if 58 <= r <= 68:
+        if r_dis - 2 <= r <= r_dis + 10:
             if 14 <= c <= 22:
-                if r <= 63: diseases['d1'] = '①. 神経痛'
+                if r <= r_dis + 3: diseases['d1'] = '①. 神経痛'
                 else: diseases['d5'] = '⑤. 腰痛症'
             elif 23 <= c <= 35:
-                if r <= 63: diseases['d2'] = '②. リウマチ'
+                if r <= r_dis + 3: diseases['d2'] = '②. リウマチ'
                 else: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
             elif 36 <= c <= 46:
-                if r <= 63: diseases['d3'] = '③. 頸腕症候群'
+                if r <= r_dis + 3: diseases['d3'] = '③. 頸腕症候群'
                 else: diseases['d7'] = '⑦. その他（　　　　　　　　　）'
             elif 47 <= c <= 58:
-                if r <= 63: diseases['d4'] = '④. 五十肩'
+                if r <= r_dis + 3: diseases['d4'] = '④. 五十肩'
 
-    for r in range(55, 70):
+    for r in range(max(1, r_dis - 5), r_dis + 15):
         for c in range(10, ws.max_column + 1):
             v = str(ws.cell(row=r, column=c).value or '')
             if any(m in v for m in ['○', '●', '◎', '①', '②', '③', '④', '⑤', '⑥', '⑦']):
@@ -1007,8 +1066,8 @@ def detect_acupuncture_diseases(ws, img_coords):
                 if 'その他' in v: diseases['d7'] = '⑦. その他（　　　　　　　　　）'
 
     # 上部の傷病名欄テキストからも補助検知
-    for r in range(25, 40):
-        for c in range(20, min(ws.max_column + 1, 60)):
+    for r in range(25, 45):
+        for c in range(15, min(ws.max_column + 1, 65)):
             v = str(ws.cell(row=r, column=c).value or '')
             if any(k in v for k in ['神経痛', '五十肩', '腰痛', 'リウマチ', '頸腕', '頸椎']):
                 if '神経痛' in v: diseases['d1'] = '①. 神経痛'
