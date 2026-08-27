@@ -970,7 +970,7 @@ def check_is_ineligible_for_standard_form(ws, sheet_type):
 def detect_payment_section(ws, img_coords):
     """支払機関欄（支払区分・預金の種類・金融機関種別・支店種別・名称）を動的判定"""
     r_start = None
-    for r in range(195, 230):
+    for r in range(140, ws.max_row + 1):
         for c in range(1, 10):
             v = str(ws.cell(row=r, column=c).value or '')
             if '支払機関' in v or '支払区分' in v:
@@ -982,10 +982,30 @@ def detect_payment_section(ws, img_coords):
     if not r_start:
         r_start = 203
 
-    bank_name = str(ws.cell(row=r_start, column=53).value or '').strip()
-    bank_type_raw = str(ws.cell(row=r_start, column=63).value or '').strip()
-    branch_name = str(ws.cell(row=r_start, column=67).value or '').strip()
-    branch_type_raw = str(ws.cell(row=r_start, column=75).value or '').strip()
+    bank_name, bank_type_raw, branch_name, branch_type_raw = "", "", "", ""
+    for c in range(35, ws.max_column + 1):
+        v = str(ws.cell(row=r_start, column=c).value or '').strip()
+        if '金融機関名' in v:
+            for co in range(c + 1, min(ws.max_column + 1, c + 15)):
+                val = ws.cell(row=r_start, column=co).value
+                if val and str(val).strip() and str(val).strip() not in ['金融機関名', '銀行', '金庫', '農協']:
+                    bank_name = str(val).strip()
+                    break
+        if any(k in v for k in ['銀行', '金庫', '農協']):
+            bank_type_raw = v
+        if '支店' in v or '本店' in v or '出張所' in v:
+            branch_type_raw = v
+            # Branch name is to the left of branch type
+            for co in range(c - 1, max(1, c - 10), -1):
+                val = ws.cell(row=r_start, column=co).value
+                if val and str(val).strip() and str(val).strip() not in ['支店', '本店', '出張所', '銀行', '金庫', '農協', bank_name]:
+                    branch_name = str(val).strip()
+                    break
+                    
+    if not bank_name: bank_name = str(ws.cell(row=r_start, column=53).value or '').strip()
+    if not bank_type_raw: bank_type_raw = str(ws.cell(row=r_start, column=63).value or '').strip()
+    if not branch_name: branch_name = str(ws.cell(row=r_start, column=67).value or '').strip()
+    if not branch_type_raw: branch_type_raw = str(ws.cell(row=r_start, column=75).value or '').strip()
     
     pay_1 = any((r, c) in img_coords for r in range(r_start+1, r_start+5) for c in range(5, 15))
     pay_2 = any((r, c) in img_coords for r in range(r_start+1, r_start+5) for c in range(16, 26))
@@ -1209,7 +1229,7 @@ def extract_calendar_marks_dynamic(spot_ws):
     col_day_map = {}
     
     # 1. 「1〜31」の日付が並ぶ行を自動探索
-    for r in range(140, 200):
+    for r in range(80, spot_ws.max_row + 1):
         found_days = {}
         for c in range(10, min(spot_ws.max_column + 1, 90)):
             v = spot_ws.cell(row=r, column=c).value
@@ -1312,7 +1332,7 @@ def parse_fee_row_smart(spot_ws, r):
 def extract_middle_fees_dynamic(spot_ws):
     """通所、訪問施術料1〜3、電療料、温罨法、特別地域、往療料、施術報告書交付料、明細書発行加算、合計、一部負担金、請求額をタテ・ヨコ完全動的抽出"""
     fees = {}
-    for r in range(65, 175):
+    for r in range(40, spot_ws.max_row + 1):
         for c in range(1, 20):
             v = str(spot_ws.cell(row=r, column=c).value or '').replace(' ', '').replace('　', '')
 
@@ -1390,7 +1410,7 @@ def extract_middle_fees_dynamic(spot_ws):
 def extract_cert_section_dynamic(spot_ws):
     """施術証明欄の郵便番号、年月日、所在地、施術所名、登録記号番号、管理者名、電話番号を動的抽出"""
     r_cert = None
-    for r in range(140, 220):
+    for r in range(100, spot_ws.max_row + 1):
         for c in range(1, 15):
             v = str(spot_ws.cell(row=r, column=c).value or '').replace(' ', '').replace('　', '')
             if '施術証明' in v or '上記のとおり施術を行い' in v:
@@ -1463,7 +1483,7 @@ def extract_cert_section_dynamic(spot_ws):
 def extract_applicant_section_dynamic(spot_ws):
     """申請欄の郵便番号、申請日、住所、広域連合名、申請者氏名、電話番号を動的抽出"""
     r_app = None
-    for r in range(175, 225):
+    for r in range(120, spot_ws.max_row + 1):
         for c in range(1, 15):
             v = str(spot_ws.cell(row=r, column=c).value or '').replace(' ', '').replace('　', '')
             if '申請欄' in v or '上記の療養に要した費用' in v:
@@ -1520,7 +1540,7 @@ def extract_applicant_section_dynamic(spot_ws):
 def extract_delegation_section_dynamic(spot_ws):
     """代理人受領委任欄の委任日、申請者住所・氏名、代理人（足森様）住所・氏名を動的抽出"""
     r_del = None
-    for r in range(210, 255):
+    for r in range(140, spot_ws.max_row + 1):
         for c in range(1, 15):
             v = str(spot_ws.cell(row=r, column=c).value or '').replace(' ', '').replace('　', '')
             if '本申請書に基づく給付金' in v or '受領を代理人に委任' in v:
@@ -1580,46 +1600,64 @@ def extract_delegation_section_dynamic(spot_ws):
 def extract_massage_body_counts_dynamic(spot_ws):
     """マッサージの同意部位別施術回数（躯幹・右上肢・左上肢・右下肢・左下肢）および変形徒手矯正術回数を動的抽出"""
     kukan, r_arm, l_arm, r_leg, l_leg = '', '', '', '', ''
-    for r in range(50, 100):
+    summary_text = None
+    
+    for r in range(40, spot_ws.max_row + 1):
         for c in range(1, 40):
             v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
-            if 'マッサージ（施術料）' in v or 'マッサージ(施術料)' in v or v == '同意部位':
-                for r_cnt in range(r, r + 6):
+            if 'マッサージ（施術料）' in v or 'マッサージ(施術料)' in v or v == '同意部位' or '躯幹' in v:
+                for r_cnt in range(r, min(spot_ws.max_row + 1, r + 10)):
                     row_vals = [(col, str(spot_ws.cell(r_cnt, col).value or '').strip()) for col in range(1, spot_ws.max_column + 1) if spot_ws.cell(r_cnt, col).value is not None]
-                    if any('施術回数' in val for col, val in row_vals):
-                        counts = [val for col, val in row_vals if '回' in val and '施術回数' not in val and val != '']
-                        if len(counts) >= 5:
-                            kukan, r_arm, l_arm, r_leg, l_leg = counts[0], counts[1], counts[2], counts[3], counts[4]
-                        elif len(counts) > 0:
-                            for col, val in row_vals:
-                                if '回' in val and '施術回数' not in val:
-                                    if col < 40 and not kukan: kukan = val
-                                    elif col < 46 and not r_arm: r_arm = val
-                                    elif col < 52 and not l_arm: l_arm = val
-                                    elif col < 58 and not r_leg: r_leg = val
-                                    elif not l_leg: l_leg = val
+                    counts = [val for col, val in row_vals if '回' in val and '施術回数' not in val and val != '']
+                    if len(counts) >= 5:
+                        kukan, r_arm, l_arm, r_leg, l_leg = counts[0], counts[1], counts[2], counts[3], counts[4]
+                        break
+                    elif any('施術回数' in val for col, val in row_vals):
+                        for col, val in row_vals:
+                            if '回' in val and '施術回数' not in val:
+                                if col < 40 and not kukan: kukan = val
+                                elif col < 46 and not r_arm: r_arm = val
+                                elif col < 52 and not l_arm: l_arm = val
+                                elif col < 58 and not r_leg: r_leg = val
+                                elif not l_leg: l_leg = val
                         break
                 if kukan or r_arm or l_arm or r_leg or l_leg: break
         if kukan or r_arm or l_arm or r_leg or l_leg: break
         
     henkei_r_arm, henkei_l_arm, henkei_r_leg, henkei_l_leg = '', '', '', ''
-    for r in range(110, 160):
+    for r in range(40, spot_ws.max_row + 1):
         for c in range(1, 40):
             v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
             if '変形徒手' in v:
-                for r_cnt in range(r, r + 6):
+                for r_cnt in range(r, min(spot_ws.max_row + 1, r + 10)):
                     row_vals = [(col, str(spot_ws.cell(r_cnt, col).value or '').strip()) for col in range(1, spot_ws.max_column + 1) if spot_ws.cell(r_cnt, col).value is not None]
-                    if any('施術回数' in val for col, val in row_vals):
-                        counts = [val for col, val in row_vals if '回' in val and '施術回数' not in val and val != '']
-                        if len(counts) >= 4:
-                            henkei_r_arm, henkei_l_arm, henkei_r_leg, henkei_l_leg = counts[0], counts[1], counts[2], counts[3]
+                    counts = [val for col, val in row_vals if '回' in val and '施術回数' not in val and val != '']
+                    if len(counts) >= 4:
+                        henkei_r_arm, henkei_l_arm, henkei_r_leg, henkei_l_leg = counts[0], counts[1], counts[2], counts[3]
+                        break
+                    elif any('施術回数' in val for col, val in row_vals):
+                        for col, val in row_vals:
+                            if '回' in val and '施術回数' not in val:
+                                if col < 46 and not henkei_r_arm: henkei_r_arm = val
+                                elif col < 52 and not henkei_l_arm: henkei_l_arm = val
+                                elif col < 58 and not henkei_r_leg: henkei_r_leg = val
+                                elif not henkei_l_leg: henkei_l_leg = val
                         break
                 if henkei_r_arm or henkei_l_arm: break
         if henkei_r_arm or henkei_l_arm: break
         
+    for r in range(60, min(spot_ws.max_row + 1, 140)):
+        s_val = spot_ws.cell(r, 63).value
+        if s_val and str(s_val).strip():
+            clean_s = str(s_val).strip().replace(' ', '').replace('　', '')
+            if not any(k in clean_s for k in ['摘要', '請求区分', '新規', '継続', '転帰']):
+                summary_text = str(s_val).strip()
+                break
+            
     return {
         'kukan': kukan, 'r_arm': r_arm, 'l_arm': l_arm, 'r_leg': r_leg, 'l_leg': l_leg,
-        'henkei_r_arm': henkei_r_arm, 'henkei_l_arm': henkei_l_arm, 'henkei_r_leg': henkei_r_leg, 'henkei_l_leg': henkei_l_leg
+        'henkei_r_arm': henkei_r_arm, 'henkei_l_arm': henkei_l_arm, 'henkei_r_leg': henkei_r_leg, 'henkei_l_leg': henkei_l_leg,
+        'summary': summary_text
     }
 
 
@@ -1629,7 +1667,7 @@ def extract_acupuncture_jutsu_counts_dynamic(spot_ws):
     jutsu2 = None
     summary_text = None
     
-    for r in range(50, 100):
+    for r in range(40, spot_ws.max_row + 1):
         for c in range(1, 40):
             v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
             if '施術の種類' in v or 'はり・きゅう' in v or '１術' in v:
@@ -1647,12 +1685,16 @@ def extract_acupuncture_jutsu_counts_dynamic(spot_ws):
                             if cnt_v and str(cnt_v).strip() and '回' in str(cnt_v):
                                 jutsu2 = str(cnt_v).strip()
                                 break
-                # 摘要欄 (BK列 = column 63)
-                for r_sub in range(r, r + 6):
-                    s_val = spot_ws.cell(r_sub, 63).value
-                    if s_val and str(s_val).strip() and str(s_val).strip().replace(' ', '').replace('　', '') != '摘要':
-                        summary_text = str(s_val).strip()
-                        break
+                break
+        if jutsu1 or jutsu2: break
+        
+    for r in range(60, min(spot_ws.max_row + 1, 140)):
+        s_val = spot_ws.cell(r, 63).value
+        if s_val and str(s_val).strip():
+            clean_s = str(s_val).strip().replace(' ', '').replace('　', '')
+            if not any(k in clean_s for k in ['摘要', '請求区分', '新規', '継続', '転帰']):
+                summary_text = str(s_val).strip()
+                break
                                 
     return {'jutsu1': jutsu1, 'jutsu2': jutsu2, 'summary': summary_text}
 
@@ -1661,7 +1703,7 @@ def extract_period_and_days_dynamic(spot_ws):
     """初療年月日、施術期間（自・至）、実日数を動的抽出"""
     shoryou_date, from_date, to_date, actual_days = None, None, None, None
     r_header = None
-    for r in range(40, 70):
+    for r in range(30, min(120, spot_ws.max_row + 1)):
         for c in range(1, 15):
             v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
             if '初療年月日' in v or '初療' in v:
@@ -1699,7 +1741,7 @@ def extract_payment_account_info_dynamic(spot_ws):
     """支払機関欄の口座番号（数字配列）および口座名義（カタカナ）を動的抽出"""
     acc_digits = []
     holder_name = None
-    for r in range(190, min(260, spot_ws.max_row + 1)):
+    for r in range(120, spot_ws.max_row + 1):
         for c in range(1, 20):
             v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
             if '口座名義' in v or 'カタカナで記入' in v or '口座番号' in v:
@@ -1758,7 +1800,7 @@ def extract_treatment_location(ws):
 def extract_consent_record(ws):
     """同意記録（同意医師の氏名、住所、同意年月日、傷病名、要加療期間）を動的抽出"""
     header_row = None
-    for r in range(200, 240):
+    for r in range(140, ws.max_row + 1):
         for c in range(1, 10):
             v = str(ws.cell(row=r, column=c).value or '')
             if '同意医師' in v or '同意\n記録' in v or '同意記録' in v:
