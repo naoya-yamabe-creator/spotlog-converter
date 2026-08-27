@@ -1142,6 +1142,188 @@ def extract_calendar_marks_dynamic(spot_ws):
     return cal_data
 
 
+def extract_middle_fees_dynamic(spot_ws):
+    """通所、訪問施術料1〜3、電療料、特別地域、往療料、明細書発行加算、合計、一部負担金、請求額を動的抽出"""
+    fees = {}
+    for r in range(65, 175):
+        for c in range(1, 20):
+            v = str(spot_ws.cell(row=r, column=c).value or '').replace(' ', '').replace('　', '')
+            if '通所' in v and 'tuusho' not in fees:
+                fees['tuusho'] = {
+                    'u_price': spot_ws.cell(row=r, column=31).value,
+                    'u_count': spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=48).value,
+                    'u_total': spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value,
+                    'l_price': spot_ws.cell(row=r+2, column=31).value,
+                    'l_count': spot_ws.cell(row=r+2, column=44).value or spot_ws.cell(row=r+2, column=48).value,
+                    'l_total': spot_ws.cell(row=r+2, column=54).value or spot_ws.cell(row=r+2, column=61).value,
+                }
+            elif ('訪問施術料１' in v or '訪問施術料1' in v) and 'h1' not in fees:
+                fees['h1'] = {
+                    'u_price': spot_ws.cell(row=r, column=31).value,
+                    'u_count': spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=48).value,
+                    'u_total': spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value,
+                    'l_price': spot_ws.cell(row=r+2, column=31).value,
+                    'l_count': spot_ws.cell(row=r+2, column=44).value or spot_ws.cell(row=r+2, column=48).value,
+                    'l_total': spot_ws.cell(row=r+2, column=54).value or spot_ws.cell(row=r+2, column=61).value,
+                }
+            elif ('訪問施術料２' in v or '訪問施術料2' in v) and 'h2' not in fees:
+                fees['h2'] = {
+                    'u_price': spot_ws.cell(row=r, column=31).value,
+                    'u_count': spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=48).value,
+                    'u_total': spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value,
+                    'l_price': spot_ws.cell(row=r+2, column=31).value,
+                    'l_count': spot_ws.cell(row=r+2, column=44).value or spot_ws.cell(row=r+2, column=48).value,
+                    'l_total': spot_ws.cell(row=r+2, column=54).value or spot_ws.cell(row=r+2, column=61).value,
+                }
+            elif ('訪問施術料３' in v or '訪問施術料3' in v) and 'h3' not in fees:
+                fees['h3'] = {
+                    'u_price': spot_ws.cell(row=r, column=31).value,
+                    'u_count': spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=48).value,
+                    'u_total': spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value,
+                    'l_price': spot_ws.cell(row=r+2, column=31).value,
+                    'l_count': spot_ws.cell(row=r+2, column=44).value or spot_ws.cell(row=r+2, column=48).value,
+                    'l_total': spot_ws.cell(row=r+2, column=54).value or spot_ws.cell(row=r+2, column=61).value,
+                }
+            elif '電療料' in v and 'denryou' not in fees:
+                fees['denryou'] = {
+                    'price': spot_ws.cell(row=r, column=31).value,
+                    'count': spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=48).value,
+                    'total': spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value,
+                }
+            elif '特別地域' in v and 'tokubetsu' not in fees:
+                fees['tokubetsu'] = {
+                    'price': spot_ws.cell(row=r, column=31).value,
+                    'count': spot_ws.cell(row=r, column=43).value or spot_ws.cell(row=r, column=48).value,
+                    'total': spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value,
+                }
+            elif '往療料' in v and 'ouryou' not in fees:
+                fees['ouryou'] = {
+                    'price': spot_ws.cell(row=r, column=31).value,
+                    'count': spot_ws.cell(row=r, column=43).value or spot_ws.cell(row=r, column=48).value,
+                    'total': spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value,
+                }
+            elif '明細書発行加算' in v and 'meisai' not in fees:
+                fees['meisai'] = spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value
+            elif ('合計' in v or '合　計' in v) and 'goukei' not in fees:
+                fees['goukei'] = spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value or spot_ws.cell(row=r, column=30).value
+            elif '一部負担金' in v and 'ichibu' not in fees:
+                fees['ichibu'] = spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value or spot_ws.cell(row=r, column=30).value
+            elif ('請求額' in v or '請　求額' in v) and 'seikyuu' not in fees:
+                fees['seikyuu'] = spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=61).value or spot_ws.cell(row=r, column=30).value
+
+    return fees
+
+
+def extract_cert_section_dynamic(spot_ws):
+    """施術証明欄の郵便番号、年月日、所在地、施術所名、登録記号番号、管理者名、電話番号を動的抽出"""
+    r_cert = None
+    for r in range(150, 210):
+        for c in range(1, 10):
+            v = str(spot_ws.cell(row=r, column=c).value or '')
+            if '施術証明' in v or '上記のとおり施術を行い' in v:
+                r_cert = r
+                break
+        if r_cert: break
+    if not r_cert: return {}
+
+    zip_val, date_val, addr_val, clinic_name, reg_no, manager_name, tel_val = None, None, None, None, None, None, None
+    for r in range(r_cert, r_cert + 16):
+        for c in range(1, spot_ws.max_column + 1):
+            v = str(spot_ws.cell(row=r, column=c).value or '')
+            if '〒' in v and not zip_val: zip_val = v.strip()
+            elif ('令和' in v or '平成' in v) and not date_val and ('年' in v): date_val = v.strip()
+            elif ('Cote' in v or '区' in v or '市' in v or '県' in v) and not addr_val and c in [49, 50, 51, 52]: addr_val = v.strip()
+            elif re.search(r'\d{8}-\d-\d', v) and not reg_no: reg_no = v.strip()
+            elif ('管理者' in v or '氏名' in v) and not manager_name and c in [49, 50, 51, 52]: manager_name = v.strip()
+            elif ('ラプラス' in v or '施術所' in v) and not clinic_name and c in [49, 50, 51, 52]: clinic_name = v.strip()
+            elif ('TEL' in v or '電話' in v) and not tel_val:
+                for co in range(c+1, c+10):
+                    cv = spot_ws.cell(row=r, column=co).value
+                    if cv and str(cv).strip() and str(cv).strip() != '電話': tel_val = str(cv).strip(); break
+
+    if not clinic_name: clinic_name = spot_ws.cell(row=r_cert+10, column=51).value
+    if not manager_name: manager_name = spot_ws.cell(row=r_cert+14, column=51).value
+
+    return {
+        'zip': zip_val,
+        'date': date_val,
+        'addr': addr_val,
+        'clinic_name': clinic_name,
+        'reg_no': reg_no,
+        'manager_name': manager_name,
+        'tel': tel_val
+    }
+
+
+def extract_applicant_section_dynamic(spot_ws):
+    """申請欄の郵便番号、申請日、住所、広域連合名、申請者氏名、電話番号を動的抽出"""
+    r_app = None
+    for r in range(175, 220):
+        for c in range(1, 10):
+            v = str(spot_ws.cell(row=r, column=c).value or '')
+            if '申請欄' in v or '上記の療養に要した費用' in v:
+                r_app = r
+                break
+        if r_app: break
+    if not r_app: return {}
+
+    zip_val, date_val, addr_val, kouiki_val, name_val, tel_val = None, None, None, None, None, None
+    for r in range(r_app, r_app + 14):
+        for c in range(1, spot_ws.max_column + 1):
+            v = str(spot_ws.cell(row=r, column=c).value or '')
+            if '〒' in v and not zip_val: zip_val = v.strip()
+            elif ('令和' in v or '平成' in v) and not date_val and ('年' in v): date_val = v.strip()
+            elif '殿' in v or '広域連合' in v: kouiki_val = v.strip()
+            elif c in [49, 50, 51, 52] and ('市' in v or '区' in v or '県' in v) and not addr_val: addr_val = v.strip()
+            elif c in [49, 50, 51, 52] and len(v.strip()) >= 2 and not any(k in v for k in ['〒', '市', '区', '県', '番号', '電話', '殿']) and not name_val:
+                name_val = v.strip()
+            elif ('TEL' in v or '電話' in v) and not tel_val:
+                for co in range(c+1, c+10):
+                    cv = spot_ws.cell(row=r, column=co).value
+                    if cv and str(cv).strip() and str(cv).strip() != '電話': tel_val = str(cv).strip(); break
+
+    return {
+        'zip': zip_val,
+        'date': date_val,
+        'addr': addr_val,
+        'kouiki': kouiki_val,
+        'name': name_val,
+        'tel': tel_val
+    }
+
+
+def extract_delegation_section_dynamic(spot_ws):
+    """代理人受領委任欄の委任日、申請者住所・氏名、代理人（足森様）住所・氏名を動的抽出"""
+    r_del = None
+    for r in range(215, 255):
+        for c in range(1, 10):
+            v = str(spot_ws.cell(row=r, column=c).value or '')
+            if '本申請書に基づく給付金' in v or '受領を代理人に委任' in v:
+                r_del = r
+                break
+        if r_del: break
+    if not r_del: return {}
+
+    date_val = spot_ws.cell(row=r_del, column=50).value or spot_ws.cell(row=r_del, column=48).value or spot_ws.cell(row=r_del, column=46).value
+    applicant_addr = spot_ws.cell(row=r_del+3, column=18).value
+    delegate_addr = spot_ws.cell(row=r_del+3, column=53).value
+    
+    applicant_name, delegate_name = None, None
+    for ro in range(r_del+5, r_del+13):
+        v1 = spot_ws.cell(row=ro, column=18).value
+        v2 = spot_ws.cell(row=ro, column=53).value
+        if v1 and str(v1).strip() and not applicant_name: applicant_name = str(v1).strip()
+        if v2 and str(v2).strip() and not delegate_name: delegate_name = str(v2).strip()
+
+    return {
+        'date': date_val,
+        'applicant_addr': applicant_addr,
+        'delegate_addr': delegate_addr,
+        'applicant_name': applicant_name,
+        'delegate_name': delegate_name
+    }
+
+
 def extract_treatment_location(ws):
     """「施術した場所」の記載内容をspotlogから抽出（通常時は請求区分見出しなどを拾わずNone）"""
     for r in range(44, 50):
@@ -1414,60 +1596,63 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     if spot_ws["AT73"].value: target_ws["BW87"] = f"１術 {spot_ws['AT73'].value}"
     if spot_ws["BE73"].value: target_ws["CT87"] = f"２術 {spot_ws['BE73'].value}"
 
-    # 通所 (Row 92..99: 格子ボックス配置)
-    u_price = spot_ws["AE77"].value
-    u_count = spot_ws["AR77"].value or ""
-    u_total = spot_ws["BB77"].value
-    l_price = spot_ws["AE79"].value if spot_ws["AE79"].value else None
-    l_count = spot_ws["AR79"].value if spot_ws["AR79"].value else None
-    l_total = spot_ws["BB79"].value if spot_ws["BB79"].value else None
-    safe_apply_grid_row(target_ws, 92, 99, u_price, u_count, u_total, l_price, l_count, l_total, is_boxed=True)
+    # 中部：各施術料・加算・合計・一部負担金・請求額（完全動的抽出）
+    m_fees = extract_middle_fees_dynamic(spot_ws)
 
-    # 訪問施術料１ (Row 100..107: 列位置完全一致)
-    safe_apply_grid_row(target_ws, 100, 107,
-                        spot_ws["AE85"].value, spot_ws["AR85"].value, spot_ws["BB85"].value,
-                        spot_ws["AE87"].value, spot_ws["AR87"].value, spot_ws["BB87"].value,
-                        is_boxed=False)
+    # 通所 (Row 92..99)
+    if 'tuusho' in m_fees:
+        tf = m_fees['tuusho']
+        safe_apply_grid_row(target_ws, 92, 99, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=True)
 
-    # 訪問施術料２ (Row 108..115: 列位置完全一致)
-    safe_apply_grid_row(target_ws, 108, 115,
-                        spot_ws["AE93"].value, spot_ws["AR93"].value, spot_ws["BB93"].value,
-                        spot_ws["AE95"].value, spot_ws["AR95"].value, spot_ws["BB95"].value,
-                        is_boxed=False)
+    # 訪問施術料１ (Row 100..107)
+    if 'h1' in m_fees:
+        tf = m_fees['h1']
+        safe_apply_grid_row(target_ws, 100, 107, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
 
-    # 訪問施術料３ (Row 116..123: 列位置完全一致)
-    safe_apply_grid_row(target_ws, 116, 123,
-                        spot_ws["AE101"].value, spot_ws["AR101"].value, spot_ws["BB101"].value,
-                        spot_ws["AE103"].value, spot_ws["AR103"].value, spot_ws["BB103"].value,
-                        is_boxed=False)
+    # 訪問施術料２ (Row 108..115)
+    if 'h2' in m_fees:
+        tf = m_fees['h2']
+        safe_apply_grid_row(target_ws, 108, 115, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
 
-    # 電療料 (加算 Row 124..128: １電気針 / ２電気温灸器 / ３電気光線器具 丸囲み動的判定)
+    # 訪問施術料３ (Row 116..123)
+    if 'h3' in m_fees:
+        tf = m_fees['h3']
+        safe_apply_grid_row(target_ws, 116, 123, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
+
+    # 電療料 (Row 124..128)
     target_ws["O124"] = detect_electrotherapy(spot_ws, img_coords)
-    safe_apply_grid_row(target_ws, 124, 128, spot_ws["AE125"].value, spot_ws["AR125"].value, spot_ws["BB125"].value, is_boxed=False)
+    if 'denryou' in m_fees:
+        tf = m_fees['denryou']
+        safe_apply_grid_row(target_ws, 124, 128, tf['price'], tf['count'], tf['total'], is_boxed=False)
 
-    # 特別地域 (加算 Row 129..133)
-    safe_apply_grid_row(target_ws, 129, 133, spot_ws["AE131"].value, spot_ws["AQ131"].value, spot_ws["BB131"].value, is_boxed=False)
+    # 特別地域 (Row 129..133)
+    if 'tokubetsu' in m_fees:
+        tf = m_fees['tokubetsu']
+        safe_apply_grid_row(target_ws, 129, 133, tf['price'], tf['count'], tf['total'], is_boxed=False)
 
     # 往療料 (Row 134..138)
-    safe_apply_grid_row(target_ws, 134, 138, spot_ws["AE134"].value, spot_ws["AQ134"].value, spot_ws["BB134"].value, is_boxed=False)
+    if 'ouryou' in m_fees:
+        tf = m_fees['ouryou']
+        safe_apply_grid_row(target_ws, 134, 138, tf['price'], tf['count'], tf['total'], is_boxed=False)
 
-    # 施術報告書交付料（前回支給年月 動的判定 Row 139..143）
+    # 施術報告書交付料 (Row 139..143)
     prev_ym_hari = extract_report_prev_date(spot_ws, is_massage=False)
     target_ws["J139"] = f"施術報告書交付料（前回支給：{prev_ym_hari}）"
-    safe_apply_grid_row(target_ws, 139, 143, spot_ws["AE137"].value, spot_ws["AQ137"].value, spot_ws["BB137"].value, is_boxed=False)
 
     # 明細書発行加算 (Row 144..148)
-    safe_apply_grid_row(target_ws, 144, 148, spot_ws["AE140"].value, spot_ws["AQ140"].value, spot_ws["BB140"].value, is_boxed=False)
+    if 'meisai' in m_fees and m_fees['meisai']:
+        safe_apply_grid_row(target_ws, 144, 148, None, None, m_fees['meisai'], is_boxed=False)
 
-    if spot_ws["AE143"].value:
-        target_ws["BF149"] = f"{format_currency_str(spot_ws['AE143'].value)} 円"
+    # 合計
+    if 'goukei' in m_fees and m_fees['goukei']:
+        target_ws["BF149"] = f"{format_currency_str(m_fees['goukei'])} 円"
         
-    # 一部負担金 & 請求額 (動的割合 ＆ 3桁カンマ)
+    # 一部負担金 & 請求額
     target_ws["J154"] = extract_copayment_ratio_text(spot_ws, marks)
-    if spot_ws["AE149"].value:
-        target_ws["BF154"] = f"{format_currency_str(spot_ws['AE149'].value)} 円"
-    if spot_ws["AE153"].value:
-        target_ws["BF159"] = f"{format_currency_str(spot_ws['AE153'].value)} 円"
+    if 'ichibu' in m_fees and m_fees['ichibu']:
+        target_ws["BF154"] = f"{format_currency_str(m_fees['ichibu'])} 円"
+    if 'seikyuu' in m_fees and m_fees['seikyuu']:
+        target_ws["BF159"] = f"{format_currency_str(m_fees['seikyuu'])} 円"
 
     # 摘要欄 (DO87:EX163 を結合して全文表示)
     try:
@@ -1491,32 +1676,34 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     # 往療又は訪問の理由 (動的複数選択対応)
     target_ws["J173"] = detect_visit_reasons(spot_ws, img_coords)
 
-    # 施術証明欄 (所在地区分動的判定)
+    # 施術証明欄 (完全動的抽出)
+    c_sec = extract_cert_section_dynamic(spot_ws)
     target_ws["DC177"] = detect_practitioner_location_type(spot_ws, img_coords)
-    if spot_ws["AY173"].value: target_ws["CR181"] = f"〒{str(spot_ws['AY173'].value).replace('〒', '')}"
-    if spot_ws["G176"].value: target_ws["M184"] = str(spot_ws["G176"].value)
-    if spot_ws["AY176"].value: target_ws["CR184"] = str(spot_ws["AY176"].value)
-    if spot_ws["G183"].value: target_ws["M191"] = str(spot_ws["G183"].value)
+    if c_sec.get('zip'): target_ws["CR181"] = f"〒{str(c_sec['zip']).replace('〒', '')}"
+    if c_sec.get('date'): target_ws["M184"] = str(c_sec['date'])
+    if c_sec.get('addr'): target_ws["CR184"] = str(c_sec['addr'])
+    if c_sec.get('reg_no'): target_ws["M191"] = str(c_sec['reg_no'])
     
     try:
         target_ws.merge_cells("CR188:EX191")
     except Exception:
         pass
-    if spot_ws["AY180"].value:
-        target_ws["CR188"] = str(spot_ws["AY180"].value)
+    if c_sec.get('clinic_name'):
+        target_ws["CR188"] = str(c_sec['clinic_name'])
         target_ws["CR188"].alignment = Alignment(vertical="center", horizontal="left")
         target_ws["CR188"].font = Font(name="ＭＳ 明朝", size=10)
         
-    if spot_ws["AY184"].value: target_ws["CR192"] = str(spot_ws["AY184"].value)
-    if spot_ws["BT184"].value: target_ws["EG192"] = str(spot_ws["BT184"].value)
+    if c_sec.get('manager_name'): target_ws["CR192"] = str(c_sec['manager_name'])
+    if c_sec.get('tel'): target_ws["EG192"] = str(c_sec['tel'])
 
-    # 申請欄
-    if spot_ws["AY188"].value: target_ws["CR196"] = f"〒{str(spot_ws['AY188'].value).replace('〒', '')}"
-    if spot_ws["G192"].value: target_ws["M200"] = str(spot_ws["G192"].value)
-    if spot_ws["AY192"].value: target_ws["CR200"] = str(spot_ws["AY192"].value)
-    if spot_ws["G196"].value: target_ws["M204"] = str(spot_ws["G196"].value)
-    if spot_ws["AY199"].value: target_ws["CR207"] = str(spot_ws["AY199"].value)
-    if spot_ws["BT199"].value: target_ws["EG207"] = str(spot_ws["BT199"].value)
+    # 申請欄 (完全動的抽出)
+    a_sec = extract_applicant_section_dynamic(spot_ws)
+    if a_sec.get('zip'): target_ws["CR196"] = f"〒{str(a_sec['zip']).replace('〒', '')}"
+    if a_sec.get('date'): target_ws["M200"] = str(a_sec['date'])
+    if a_sec.get('addr'): target_ws["CR200"] = str(a_sec['addr'])
+    if a_sec.get('kouiki'): target_ws["M204"] = str(a_sec['kouiki'])
+    if a_sec.get('name'): target_ws["CR207"] = str(a_sec['name'])
+    if a_sec.get('tel'): target_ws["EG207"] = str(a_sec['tel'])
 
     # 支払機関欄 (完全動的判定)
     pay_sec = detect_payment_section(spot_ws, img_coords)
@@ -1596,8 +1783,9 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
         target_ws["DE229"] = None
         target_ws["EF229"] = None
 
-    # 委任状欄
-    if spot_ws["AX225"].value: target_ws["CP240"] = str(spot_ws["AX225"].value)
+    # 委任状欄 (完全動的抽出)
+    d_sec = extract_delegation_section_dynamic(spot_ws)
+    if d_sec.get('date'): target_ws["CP240"] = str(d_sec['date'])
     
     target_ws["J244"] = "申請者"
     target_ws["J244"].alignment = Alignment(horizontal="center", vertical="center")
@@ -1610,21 +1798,21 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     
     target_ws["CD252"] = None
     
-    applicant_addr = str(spot_ws["R228"].value or "")
+    applicant_addr = str(d_sec.get('applicant_addr') or "")
     target_ws["AA244"] = f"住所　{applicant_addr}" if applicant_addr else "住所　"
     target_ws["AA244"].alignment = Alignment(wrap_text=True, vertical="center", horizontal="left")
     target_ws["AA244"].font = Font(name="ＭＳ 明朝", size=10)
     
-    target_ws["CU244"] = format_proxy_address(spot_ws["BA228"].value)
+    target_ws["CU244"] = format_proxy_address(d_sec.get('delegate_addr'))
     target_ws["CU244"].alignment = Alignment(wrap_text=True, vertical="center", horizontal="left")
     target_ws["CU244"].font = Font(name="ＭＳ 明朝", size=8.5)
     
-    applicant_name = str(spot_ws["R235"].value or "")
+    applicant_name = str(d_sec.get('applicant_name') or "")
     target_ws["AA252"] = f"氏名　{applicant_name}" if applicant_name else "氏名　"
     target_ws["AA252"].alignment = Alignment(vertical="center", horizontal="left")
     target_ws["AA252"].font = Font(name="ＭＳ 明朝", size=10)
     
-    proxy_name = str(spot_ws["BA235"].value or "")
+    proxy_name = str(d_sec.get('delegate_name') or "")
     target_ws["CU252"] = f"氏名　{proxy_name}" if proxy_name else "氏名　"
     target_ws["CU252"].alignment = Alignment(vertical="center", horizontal="left")
     target_ws["CU252"].font = Font(name="ＭＳ 明朝", size=10)
@@ -1766,32 +1954,28 @@ def convert_massage_dynamic(spot_ws, target_ws):
     target_ws["DE84"] = str(spot_ws["BF71"].value or "")
     target_ws["DE84"].alignment = Alignment(horizontal="center", vertical="center")
 
-    # 通所 (Row 88..95: 訪問施術料1と完全に揃えた格子・列配置)
-    u_p = spot_ws["AD74"].value
-    u_c = spot_ws["AO74"].value or spot_ws["AR74"].value
-    u_t = spot_ws["BA74"].value or spot_ws["AD74"].value
-    l_p = spot_ws["AD76"].value if spot_ws["AD76"].value else None
-    l_c = (spot_ws["AO76"].value or spot_ws["AR76"].value) if spot_ws["AD76"].value else None
-    l_t = spot_ws["BA76"].value if spot_ws["AD76"].value else None
-    safe_apply_grid_row(target_ws, 88, 95, u_p, u_c, u_t, l_p, l_c, l_t, is_boxed=False)
+    # 中部：各施術料・加算・合計・一部負担金・請求額（完全動的抽出）
+    m_fees = extract_middle_fees_dynamic(spot_ws)
 
-    # 訪問施術料１ (Row 96..103: 列位置完全一致)
-    safe_apply_grid_row(target_ws, 96, 103,
-                        spot_ws["AD82"].value, spot_ws["AO82"].value or spot_ws["AR82"].value, spot_ws["BA82"].value,
-                        spot_ws["AD84"].value, spot_ws["AO84"].value or spot_ws["AR84"].value, spot_ws["BA84"].value,
-                        is_boxed=False)
-            
-    # 訪問施術料２ (Row 104..111: 列位置完全一致)
-    safe_apply_grid_row(target_ws, 104, 111,
-                        spot_ws["AD90"].value, spot_ws["AO90"].value or spot_ws["AR90"].value, spot_ws["BA90"].value,
-                        spot_ws["AD92"].value, spot_ws["AO92"].value or spot_ws["AR92"].value, spot_ws["BA92"].value,
-                        is_boxed=False)
+    # 通所 (Row 88..95)
+    if 'tuusho' in m_fees:
+        tf = m_fees['tuusho']
+        safe_apply_grid_row(target_ws, 88, 95, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
 
-    # 訪問施術料３ (Row 112..119: 列位置完全一致)
-    safe_apply_grid_row(target_ws, 112, 119,
-                        spot_ws["AD98"].value, spot_ws["AO98"].value or spot_ws["AR98"].value, spot_ws["BA98"].value,
-                        spot_ws["AD100"].value, spot_ws["AO100"].value or spot_ws["AR100"].value, spot_ws["BA100"].value,
-                        is_boxed=False)
+    # 訪問施術料１ (Row 96..103)
+    if 'h1' in m_fees:
+        tf = m_fees['h1']
+        safe_apply_grid_row(target_ws, 96, 103, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
+
+    # 訪問施術料２ (Row 104..111)
+    if 'h2' in m_fees:
+        tf = m_fees['h2']
+        safe_apply_grid_row(target_ws, 104, 111, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
+
+    # 訪問施術料３ (Row 112..119)
+    if 'h3' in m_fees:
+        tf = m_fees['h3']
+        safe_apply_grid_row(target_ws, 112, 119, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
 
     # 温罨法 (加算 Row 120..123)
     safe_apply_grid_row(target_ws, 120, 123, spot_ws["AD122"].value, spot_ws["AO122"].value or spot_ws["AR122"].value, spot_ws["BA122"].value, is_boxed=False)
@@ -1811,28 +1995,33 @@ def convert_massage_dynamic(spot_ws, target_ws):
     safe_apply_grid_row(target_ws, 136, 139, spot_ws["AD140"].value, spot_ws["AO140"].value or spot_ws["AR140"].value, spot_ws["BA140"].value, is_boxed=False)
 
     # 特別地域 (加算 Row 140..143)
-    safe_apply_grid_row(target_ws, 140, 143, spot_ws["AD143"].value, spot_ws["AO143"].value or spot_ws["AR143"].value, spot_ws["BA143"].value, is_boxed=False)
+    if 'tokubetsu' in m_fees:
+        tf = m_fees['tokubetsu']
+        safe_apply_grid_row(target_ws, 140, 143, tf['price'], tf['count'], tf['total'], is_boxed=False)
 
     # 往療料 (Row 144..147)
-    safe_apply_grid_row(target_ws, 144, 147, spot_ws["AD149"].value, spot_ws["AO149"].value or spot_ws["AR149"].value, spot_ws["BA149"].value, is_boxed=False)
+    if 'ouryou' in m_fees:
+        tf = m_fees['ouryou']
+        safe_apply_grid_row(target_ws, 144, 147, tf['price'], tf['count'], tf['total'], is_boxed=False)
 
-    # 施術報告書交付料（前回支給年月 動的判定 Row 148..151）
+    # 施術報告書交付料
     prev_ym_mass = extract_report_prev_date(spot_ws, is_massage=True)
     target_ws["J148"] = f"施術報告書交付料　（前回支給：{prev_ym_mass}）"
-    safe_apply_grid_row(target_ws, 148, 151, spot_ws["AD152"].value, spot_ws["AO152"].value or spot_ws["AR152"].value, spot_ws["BA152"].value, is_boxed=False)
         
     # 明細書発行加算 (Row 152..155)
-    safe_apply_grid_row(target_ws, 152, 155, spot_ws["AD155"].value, spot_ws["AO155"].value or spot_ws["AR155"].value, spot_ws["BA155"].value, is_boxed=False)
+    if 'meisai' in m_fees and m_fees['meisai']:
+        safe_apply_grid_row(target_ws, 152, 155, None, None, m_fees['meisai'], is_boxed=False)
 
-    if spot_ws["AD158"].value:
-        target_ws["BF156"] = f"{format_currency_str(spot_ws['AD158'].value)} 円"
+    # 合計
+    if 'goukei' in m_fees and m_fees['goukei']:
+        target_ws["BF156"] = f"{format_currency_str(m_fees['goukei'])} 円"
         
-    # 一部負担金 & 請求額 (動的割合 ＆ 3桁カンマ)
+    # 一部負担金 & 請求額
     target_ws["J160"] = extract_copayment_ratio_text(spot_ws, marks)
-    if spot_ws["AD164"].value:
-        target_ws["BF160"] = f"{format_currency_str(spot_ws['AD164'].value)} 円"
-    if spot_ws["AD167"].value:
-        target_ws["BF164"] = f"{format_currency_str(spot_ws['AD167'].value)} 円"
+    if 'ichibu' in m_fees and m_fees['ichibu']:
+        target_ws["BF160"] = f"{format_currency_str(m_fees['ichibu'])} 円"
+    if 'seikyuu' in m_fees and m_fees['seikyuu']:
+        target_ws["BF164"] = f"{format_currency_str(m_fees['seikyuu'])} 円"
 
     # 摘要欄 (DO87:EX167 を結合して全文表示)
     try:
@@ -1856,28 +2045,34 @@ def convert_massage_dynamic(spot_ws, target_ws):
     # 往療又は訪問の理由 (動的複数選択対応)
     target_ws["J177"] = detect_visit_reasons(spot_ws, img_coords)
 
-    # 施術証明欄 (所在地区分動的判定)
+    # 施術証明欄 (完全動的抽出)
+    c_sec = extract_cert_section_dynamic(spot_ws)
     target_ws["DC181"] = detect_practitioner_location_type(spot_ws, img_coords)
-    if spot_ws["AY186"].value: target_ws["CR185"] = f"〒{str(spot_ws['AY186'].value).replace('〒', '')}"
-    if spot_ws["G189"].value: target_ws["M188"] = str(spot_ws["G189"].value)
-    if spot_ws["AY189"].value: target_ws["CR188"] = str(spot_ws["AY189"].value)
-    if spot_ws["G196"].value: target_ws["M195"] = str(spot_ws["G196"].value)
+    if c_sec.get('zip'): target_ws["CR185"] = f"〒{str(c_sec['zip']).replace('〒', '')}"
+    if c_sec.get('date'): target_ws["M188"] = str(c_sec['date'])
+    if c_sec.get('addr'): target_ws["CR188"] = str(c_sec['addr'])
+    if c_sec.get('reg_no'): target_ws["M195"] = str(c_sec['reg_no'])
     
-    if spot_ws["AY193"].value:
-        target_ws["CR192"] = str(spot_ws["AY193"].value)
+    try:
+        target_ws.merge_cells("CR192:EX195")
+    except Exception:
+        pass
+    if c_sec.get('clinic_name'):
+        target_ws["CR192"] = str(c_sec['clinic_name'])
         target_ws["CR192"].alignment = Alignment(vertical="center", horizontal="left")
         target_ws["CR192"].font = Font(name="ＭＳ 明朝", size=10)
         
-    if spot_ws["AY197"].value: target_ws["CR196"] = str(spot_ws["AY197"].value)
-    if spot_ws["BT197"].value: target_ws["EG196"] = str(spot_ws["BT197"].value)
+    if c_sec.get('manager_name'): target_ws["CR196"] = str(c_sec['manager_name'])
+    if c_sec.get('tel'): target_ws["EG196"] = str(c_sec['tel'])
 
-    # 申請欄
-    if spot_ws["AY201"].value: target_ws["CR200"] = f"〒{str(spot_ws['AY201'].value).replace('〒', '')}"
-    if spot_ws["G204"].value: target_ws["M204"] = str(spot_ws["G204"].value)
-    if spot_ws["AY204"].value: target_ws["CR204"] = str(spot_ws["AY204"].value)
-    if spot_ws["G208"].value: target_ws["M208"] = str(spot_ws["G208"].value)
-    if spot_ws["AY210"].value: target_ws["CR211"] = str(spot_ws["AY210"].value)
-    if spot_ws["BT210"].value: target_ws["EG211"] = str(spot_ws["BT210"].value)
+    # 申請欄 (完全動的抽出)
+    a_sec = extract_applicant_section_dynamic(spot_ws)
+    if a_sec.get('zip'): target_ws["CR200"] = f"〒{str(a_sec['zip']).replace('〒', '')}"
+    if a_sec.get('date'): target_ws["M204"] = str(a_sec['date'])
+    if a_sec.get('addr'): target_ws["CR204"] = str(a_sec['addr'])
+    if a_sec.get('kouiki'): target_ws["M208"] = str(a_sec['kouiki'])
+    if a_sec.get('name'): target_ws["CR211"] = str(a_sec['name'])
+    if a_sec.get('tel'): target_ws["EG211"] = str(a_sec['tel'])
 
     # 支払機関欄 (完全動的判定)
     pay_sec = detect_payment_section(spot_ws, img_coords)
@@ -1957,8 +2152,9 @@ def convert_massage_dynamic(spot_ws, target_ws):
         target_ws["DE233"] = None
         target_ws["EF233"] = None
 
-    # 委任状欄
-    if spot_ws["AX237"].value: target_ws["CP243"] = str(spot_ws["AX237"].value)
+    # 委任状欄 (完全動的抽出)
+    d_sec = extract_delegation_section_dynamic(spot_ws)
+    if d_sec.get('date'): target_ws["CP243"] = str(d_sec['date'])
     
     target_ws["J247"] = "申請者"
     target_ws["J247"].alignment = Alignment(horizontal="center", vertical="center")
@@ -1971,21 +2167,21 @@ def convert_massage_dynamic(spot_ws, target_ws):
     
     target_ws["CD255"] = None
     
-    applicant_addr = str(spot_ws["R240"].value or "")
+    applicant_addr = str(d_sec.get('applicant_addr') or "")
     target_ws["AA247"] = f"住所　{applicant_addr}" if applicant_addr else "住所　"
     target_ws["AA247"].alignment = Alignment(wrap_text=True, vertical="center", horizontal="left")
     target_ws["AA247"].font = Font(name="ＭＳ 明朝", size=10)
     
-    target_ws["CU247"] = format_proxy_address(spot_ws["BA240"].value)
+    target_ws["CU247"] = format_proxy_address(d_sec.get('delegate_addr'))
     target_ws["CU247"].alignment = Alignment(wrap_text=True, vertical="center", horizontal="left")
     target_ws["CU247"].font = Font(name="ＭＳ 明朝", size=8.5)
     
-    applicant_name = str(spot_ws["R247"].value or "")
+    applicant_name = str(d_sec.get('applicant_name') or "")
     target_ws["AA255"] = f"氏名　{applicant_name}" if applicant_name else "氏名　"
     target_ws["AA255"].alignment = Alignment(vertical="center", horizontal="left")
     target_ws["AA255"].font = Font(name="ＭＳ 明朝", size=10)
     
-    proxy_name = str(spot_ws["BA247"].value or "")
+    proxy_name = str(d_sec.get('delegate_name') or "")
     target_ws["CU255"] = f"氏名　{proxy_name}" if proxy_name else "氏名　"
     target_ws["CU255"].alignment = Alignment(vertical="center", horizontal="left")
     target_ws["CU255"].font = Font(name="ＭＳ 明朝", size=10)
