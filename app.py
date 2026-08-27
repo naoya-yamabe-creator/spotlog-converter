@@ -7,7 +7,7 @@ import re
 import os
 import time
 import base64
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # 画面基本設定
 st.set_page_config(
@@ -2651,8 +2651,9 @@ def main():
                 st.session_state.uploader_key += 1
                 st.rerun()
 
-            # 日時付きファイル名を生成
-            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # 日時付きファイル名を生成（日本時間 JST: UTC+9 で固定）
+            jst = timezone(timedelta(hours=9))
+            timestamp_str = datetime.now(jst).strftime("%Y%m%d_%H%M%S")
             output_filename = f"基準様式_一括変換結果_{timestamp_str}.xlsx"
             
             # メモリバッファに書き出し（Webダウンロード用）
