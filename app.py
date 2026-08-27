@@ -1487,6 +1487,84 @@ def extract_delegation_section_dynamic(spot_ws):
     }
 
 
+def extract_massage_body_counts_dynamic(spot_ws):
+    """マッサージの同意部位別施術回数（躯幹・右上肢・左上肢・右下肢・左下肢）および変形徒手矯正術回数を動的抽出"""
+    kukan, r_arm, l_arm, r_leg, l_leg = '', '', '', '', ''
+    for r in range(50, 100):
+        for c in range(1, 40):
+            v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
+            if 'マッサージ（施術料）' in v or 'マッサージ(施術料)' in v or v == '同意部位':
+                for r_cnt in range(r, r + 6):
+                    row_vals = [(col, str(spot_ws.cell(r_cnt, col).value or '').strip()) for col in range(1, spot_ws.max_column + 1) if spot_ws.cell(r_cnt, col).value is not None]
+                    if any('施術回数' in val for col, val in row_vals):
+                        counts = [val for col, val in row_vals if '回' in val and '施術回数' not in val and val != '']
+                        if len(counts) >= 5:
+                            kukan, r_arm, l_arm, r_leg, l_leg = counts[0], counts[1], counts[2], counts[3], counts[4]
+                        elif len(counts) > 0:
+                            for col, val in row_vals:
+                                if '回' in val and '施術回数' not in val:
+                                    if col < 40 and not kukan: kukan = val
+                                    elif col < 46 and not r_arm: r_arm = val
+                                    elif col < 52 and not l_arm: l_arm = val
+                                    elif col < 58 and not r_leg: r_leg = val
+                                    elif not l_leg: l_leg = val
+                        break
+                if kukan or r_arm or l_arm or r_leg or l_leg: break
+        if kukan or r_arm or l_arm or r_leg or l_leg: break
+        
+    henkei_r_arm, henkei_l_arm, henkei_r_leg, henkei_l_leg = '', '', '', ''
+    for r in range(110, 160):
+        for c in range(1, 40):
+            v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
+            if '変形徒手' in v:
+                for r_cnt in range(r, r + 6):
+                    row_vals = [(col, str(spot_ws.cell(r_cnt, col).value or '').strip()) for col in range(1, spot_ws.max_column + 1) if spot_ws.cell(r_cnt, col).value is not None]
+                    if any('施術回数' in val for col, val in row_vals):
+                        counts = [val for col, val in row_vals if '回' in val and '施術回数' not in val and val != '']
+                        if len(counts) >= 4:
+                            henkei_r_arm, henkei_l_arm, henkei_r_leg, henkei_l_leg = counts[0], counts[1], counts[2], counts[3]
+                        break
+                if henkei_r_arm or henkei_l_arm: break
+        if henkei_r_arm or henkei_l_arm: break
+        
+    return {
+        'kukan': kukan, 'r_arm': r_arm, 'l_arm': l_arm, 'r_leg': r_leg, 'l_leg': l_leg,
+        'henkei_r_arm': henkei_r_arm, 'henkei_l_arm': henkei_l_arm, 'henkei_r_leg': henkei_r_leg, 'henkei_l_leg': henkei_l_leg
+    }
+
+
+def extract_acupuncture_jutsu_counts_dynamic(spot_ws):
+    """はり・きゅうの1術・2術回数および摘要欄テキストを動的抽出"""
+    jutsu1 = None
+    jutsu2 = None
+    summary_text = None
+    
+    for r in range(50, 100):
+        for c in range(1, 40):
+            v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
+            if '施術の種類' in v or 'はり・きゅう' in v or '１術' in v:
+                for co in range(1, spot_ws.max_column + 1):
+                    cv = str(spot_ws.cell(r, co).value or '').replace(' ', '').replace('　', '')
+                    if '１術' in cv or '1術' in cv:
+                        for c_next in range(co + 1, co + 8):
+                            cnt_v = spot_ws.cell(r, c_next).value
+                            if cnt_v and str(cnt_v).strip() and '回' in str(cnt_v):
+                                jutsu1 = str(cnt_v).strip()
+                                break
+                    elif '２術' in cv or '2術' in cv:
+                        for c_next in range(co + 1, co + 8):
+                            cnt_v = spot_ws.cell(r, c_next).value
+                            if cnt_v and str(cnt_v).strip() and '回' in str(cnt_v):
+                                jutsu2 = str(cnt_v).strip()
+                                break
+                # 摘要欄 (BK列 = column 63)
+                s_val = spot_ws.cell(r, 63).value
+                if s_val and str(s_val).strip() and str(s_val).strip() != '摘　要':
+                    summary_text = str(s_val).strip()
+                                
+    return {'jutsu1': jutsu1, 'jutsu2': jutsu2, 'summary': summary_text}
+
+
 def extract_treatment_location(ws):
     """「施術した場所」の記載内容をspotlogから抽出（通常時は請求区分見出しなどを拾わずNone）"""
     for r in range(44, 50):
@@ -1755,9 +1833,10 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     if fe_res['price']:
         target_ws["BF82"] = f"{fe_res['price']} 円"
 
-    # 施術の種類 (1術・2術 回数)
-    if spot_ws["AT73"].value: target_ws["BW87"] = f"１術 {spot_ws['AT73'].value}"
-    if spot_ws["BE73"].value: target_ws["CT87"] = f"２術 {spot_ws['BE73'].value}"
+    # 施術の種類 (1術・2術 回数 & 摘要欄 動的抽出)
+    ac_jutsu = extract_acupuncture_jutsu_counts_dynamic(spot_ws)
+    if ac_jutsu.get('jutsu1'): target_ws["BW87"] = f"１術 {ac_jutsu['jutsu1']}"
+    if ac_jutsu.get('jutsu2'): target_ws["CT87"] = f"２術 {ac_jutsu['jutsu2']}"
 
     # 中部：各施術料・加算・合計・一部負担金・請求額（完全動的抽出）
     m_fees = extract_middle_fees_dynamic(spot_ws)
@@ -1833,8 +1912,9 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
         target_ws.merge_cells("DO87:EX163")
     except Exception:
         pass
-    if spot_ws["BK73"].value:
-        target_ws["DO87"] = str(spot_ws["BK73"].value)
+    summary_val = ac_jutsu.get('summary') or spot_ws["BK73"].value
+    if summary_val:
+        target_ws["DO87"] = str(summary_val)
         target_ws["DO87"].alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
         target_ws["DO87"].font = Font(name="ＭＳ 明朝", size=9)
 
@@ -2110,22 +2190,36 @@ def convert_massage_dynamic(spot_ws, target_ws):
     target_ws["DO76"] = detect_outcome(spot_ws, img_coords)
     target_ws["DO76"].alignment = Alignment(horizontal="center", vertical="center")
 
-    # 傷病名及び症状 (AQ72: spotlogのW59の値をそのまま転記)
-    diag_text = str(spot_ws["W59"].value or "").strip()
+    # 傷病名及び症状 (動的検索)
+    diag_text = ""
+    for r in range(40, 80):
+        for c in range(1, 15):
+            v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
+            if '傷病名及び症状' in v or '傷病名' in v:
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    dv = spot_ws.cell(r, co).value
+                    if dv and len(str(dv).strip()) > 3 and not diag_text:
+                        diag_text = str(dv).strip()
+                        break
+            if diag_text: break
+        if diag_text: break
+    if not diag_text:
+        diag_text = str(spot_ws["W59"].value or "").strip()
     target_ws["AQ72"] = diag_text
     target_ws["AQ72"].alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
     target_ws["AQ72"].font = Font(name="ＭＳ Ｐ明朝", size=8.0)
 
-    # 同意部位・施術回数 (Row 84)
-    target_ws["BQ84"] = str(spot_ws["AJ71"].value or "")
+    # 同意部位・施術回数 (Row 84 動的抽出)
+    mb_counts = extract_massage_body_counts_dynamic(spot_ws)
+    target_ws["BQ84"] = mb_counts.get('kukan', '')
     target_ws["BQ84"].alignment = Alignment(horizontal="center", vertical="center")
-    target_ws["CA84"] = str(spot_ws["AO71"].value or "")
+    target_ws["CA84"] = mb_counts.get('r_arm', '')
     target_ws["CA84"].alignment = Alignment(horizontal="center", vertical="center")
-    target_ws["CK84"] = str(spot_ws["AU71"].value or "")
+    target_ws["CK84"] = mb_counts.get('l_arm', '')
     target_ws["CK84"].alignment = Alignment(horizontal="center", vertical="center")
-    target_ws["CU84"] = str(spot_ws["BA71"].value or "")
+    target_ws["CU84"] = mb_counts.get('r_leg', '')
     target_ws["CU84"].alignment = Alignment(horizontal="center", vertical="center")
-    target_ws["DE84"] = str(spot_ws["BF71"].value or "")
+    target_ws["DE84"] = mb_counts.get('l_leg', '')
     target_ws["DE84"].alignment = Alignment(horizontal="center", vertical="center")
 
     # 中部：各施術料・加算・合計・一部負担金・請求額（完全動的抽出）
@@ -2161,16 +2255,20 @@ def convert_massage_dynamic(spot_ws, target_ws):
         tf = m_fees['on_den']
         safe_apply_grid_row(target_ws, 124, 127, tf['price'], tf['count'], tf['total'], is_boxed=False)
 
-    # 変形徒手矯正術 (Row 132 & Row 136..139)
-    target_ws["BS132"] = str(spot_ws["AK137"].value or "")
+    # 変形徒手矯正術 (Row 132 & Row 136..139 動的抽出)
+    target_ws["BS132"] = mb_counts.get('henkei_r_arm', '')
     target_ws["BS132"].alignment = Alignment(horizontal="center", vertical="center")
-    target_ws["CE132"] = str(spot_ws["AR137"].value or "")
+    target_ws["CE132"] = mb_counts.get('henkei_l_arm', '')
     target_ws["CE132"].alignment = Alignment(horizontal="center", vertical="center")
-    target_ws["CQ132"] = str(spot_ws["AY137"].value or "")
+    target_ws["CQ132"] = mb_counts.get('henkei_r_leg', '')
     target_ws["CQ132"].alignment = Alignment(horizontal="center", vertical="center")
-    target_ws["DC132"] = str(spot_ws["BE137"].value or "")
+    target_ws["DC132"] = mb_counts.get('henkei_l_leg', '')
     target_ws["DC132"].alignment = Alignment(horizontal="center", vertical="center")
-    safe_apply_grid_row(target_ws, 136, 139, spot_ws["AD140"].value, spot_ws["AO140"].value or spot_ws["AR140"].value, spot_ws["BA140"].value, is_boxed=False)
+    if 'henkei' in m_fees and m_fees['henkei']:
+        tf = m_fees['henkei']
+        safe_apply_grid_row(target_ws, 136, 139, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    else:
+        safe_apply_grid_row(target_ws, 136, 139, None, None, None, is_boxed=False)
 
     # 特別地域 (加算 Row 140..143)
     if 'tokubetsu' in m_fees:
