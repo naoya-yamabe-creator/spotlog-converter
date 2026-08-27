@@ -613,35 +613,35 @@ def detect_special_marks(ws, img_coords):
         for c in range(40, ws.max_column + 1):
             v = str(ws.cell(row=r, column=c).value or '')
             if any(m in v for m in ['○', '●', '◎', '①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩']):
-                if '社国' in v: res['shakoku'] = '○1 社国'
-                if '後高' in v: res['koukou'] = '○3 後高'
-                if '公費' in v: res['kouhi'] = '○2 公費'
-                if '本外' in v: res['hon_gai'] = '○2 本外'
-                if '六外' in v: res['roku_gai'] = '○4 六外'
-                if '家外' in v: res['ie_gai'] = '○6 家外'
-                if '高外一' in v or '高外1' in v: res['kou_gai_1'] = '○8 高外一'
-                if '高外7' in v or '高外0' in v: res['kou_gai_7'] = '○0 高外7'
+                if '社国' in v: res['shakoku'] = '① 社国'
+                if '後高' in v: res['koukou'] = '③ 後高'
+                if '公費' in v: res['kouhi'] = '② 公費'
+                if '本外' in v: res['hon_gai'] = '② 本外'
+                if '六外' in v: res['roku_gai'] = '④ 六外'
+                if '家外' in v: res['ie_gai'] = '⑥ 家外'
+                if '高外一' in v or '高外1' in v: res['kou_gai_1'] = '⑧ 高外一'
+                if '高外7' in v or '高外0' in v: res['kou_gai_7'] = '⓪ 高外7'
 
     for (r, c) in img_coords:
         if 10 <= r <= 19:
             if 48 <= c <= 54:
-                if r <= 14: res['shakoku'] = '○1 社国'
-                else: res['kouhi'] = '○2 公費'
+                if r <= 14: res['shakoku'] = '① 社国'
+                else: res['kouhi'] = '② 公費'
             elif 55 <= c <= 59:
-                res['koukou'] = '○3 後高'
+                res['koukou'] = '③ 後高'
             elif 60 <= c <= 63:
-                if r <= 13: res['hon_gai'] = '○2 本外'
-                elif r <= 15: res['roku_gai'] = '○4 六外'
-                else: res['ie_gai'] = '○6 家外'
+                if r <= 13: res['hon_gai'] = '② 本外'
+                elif r <= 15: res['roku_gai'] = '④ 六外'
+                else: res['ie_gai'] = '⑥ 家外'
             elif 64 <= c <= 69:
-                if r <= 14: res['kou_gai_1'] = '○8 高外一'
-                else: res['kou_gai_7'] = '○0 高外7'
+                if r <= 14: res['kou_gai_1'] = '⑧ 高外一'
+                else: res['kou_gai_7'] = '⓪ 高外7'
             elif 70 <= c <= 73:
-                res['rate_8'] = '○8'
+                res['rate_8'] = '⑧'
             elif 74 <= c <= 76:
-                res['rate_9'] = '○9'
+                res['rate_9'] = '⑨'
             elif 77 <= c <= 82:
-                res['rate_10'] = '○10'
+                res['rate_10'] = '⑩'
                 
     return res
 
@@ -652,18 +652,18 @@ def extract_copayment_ratio_text(ws, marks):
         for c in range(1, 30):
             v = str(ws.cell(row=r, column=c).value or '')
             if '2割' in v or '２割' in v:
-                return "一部負担金（１ 割 ・ ○２ 割 ・ ３ 割）"
+                return "一部負担金（１ 割 ・ ② 割 ・ ３ 割）"
             elif '3割' in v or '３割' in v:
-                return "一部負担金（１ 割 ・ ２ 割 ・ ○３ 割）"
+                return "一部負担金（１ 割 ・ ２ 割 ・ ③ 割）"
             elif '1割' in v or '１割' in v:
-                return "一部負担金（○１ 割 ・ ２ 割 ・ ３ 割）"
+                return "一部負担金（① 割 ・ ２ 割 ・ ３ 割）"
                 
-    if '○8' in marks.get('rate_8', ''):
-        return "一部負担金（１ 割 ・ ○２ 割 ・ ３ 割）"
-    elif '○10' in marks.get('rate_10', ''):
-        return "一部負担金（１ 割 ・ ２ 割 ・ ○３ 割）"
-    elif '○9' in marks.get('rate_9', ''):
-        return "一部負担金（○１ 割 ・ ２ 割 ・ ３ 割）"
+    if '⑧' in marks.get('rate_8', ''):
+        return "一部負担金（１ 割 ・ ② 割 ・ ３ 割）"
+    elif '⑩' in marks.get('rate_10', ''):
+        return "一部負担金（１ 割 ・ ２ 割 ・ ③ 割）"
+    elif '⑨' in marks.get('rate_9', ''):
+        return "一部負担金（① 割 ・ ２ 割 ・ ３ 割）"
         
     return "一部負担金（１ 割 ・ ２ 割 ・ ３ 割）"
 
@@ -681,11 +681,11 @@ def detect_work_injury(ws, img_coords):
         inside_txt = "　不　詳　"
         
     if r1:
-        return f"（　○１．業務上　２．第三者行為　３．その他（　　　　））"
+        return f"（　① 業務上　２．第三者行為　３．その他（　　　　））"
     elif r2:
-        return f"（　１．業務上　○２．第三者行為　３．その他（　　　　））"
+        return f"（　１．業務上　② 第三者行為　３．その他（　　　　））"
     elif r3 or "その他" in other_val:
-        return f"（　１．業務上　２．第三者行為　○３．その他（{inside_txt}））"
+        return f"（　１．業務上　２．第三者行為　③ その他（{inside_txt}））"
     else:
         return f"（　１．業務上　２．第三者行為　３．その他（{inside_txt}））"
 
@@ -750,9 +750,9 @@ def detect_visit_reasons(ws, img_coords):
     if m and m.group(1).strip():
         other_txt = m.group(1)
 
-    opt1_str = "○１．独歩による公共交通機関を使っての外出困難" if r1 else "１．独歩による公共交通機関を使っての外出困難"
-    opt2_str = "○２．認知症や視覚、内部、精神障害などにより独歩による外出困難" if r2 else "２．認知症や視覚、内部、精神障害などにより独歩による外出困難"
-    opt3_str = f"○３．その他（{other_txt}）" if r3 else f"３．その他（{other_txt}）"
+    opt1_str = "① 独歩による公共交通機関を使っての外出困難" if r1 else "１．独歩による公共交通機関を使っての外出困難"
+    opt2_str = "② 認知症や視覚、内部、精神障害などにより独歩による外出困難" if r2 else "２．認知症や視覚、内部、精神障害などにより独歩による外出困難"
+    opt3_str = f"③ その他（{other_txt}）" if r3 else f"３．その他（{other_txt}）"
 
     return f"○往療又は訪問の理由（ {opt1_str}　{opt2_str}　{opt3_str} ）"
 
@@ -761,8 +761,8 @@ def detect_practitioner_location_type(ws, img_coords):
     """施術証明欄の「1.施術所所在地」「2.出張専門施術者住所地」を動的判定"""
     is_house_call = any((r, c) in img_coords for r in range(168, 186) for c in range(60, 75))
     if is_house_call:
-        return "1.施術所所在地　○2.出張専門施術者住所地"
-    return "○1.施術所所在地　2.出張専門施術者住所地"
+        return "1.施術所所在地　② 出張専門施術者住所地"
+    return "① 施術所所在地　2.出張専門施術者住所地"
 
 
 def detect_electrotherapy(ws, img_coords):
@@ -777,9 +777,9 @@ def detect_electrotherapy(ws, img_coords):
     if '○２' in val or '②' in val: opt2 = True
     if '○３' in val or '③' in val: opt3 = True
     
-    s1 = '○１電気針' if opt1 else '１電気針'
-    s2 = '○２電気温灸器' if opt2 else '２電気温灸器'
-    s3 = '○３電気光線器具' if opt3 else '３電気光線器具'
+    s1 = '① 電気針' if opt1 else '１電気針'
+    s2 = '② 電気温灸器' if opt2 else '２電気温灸器'
+    s3 = '③ 電気光線器具' if opt3 else '３電気光線器具'
     return f"電療料（加算／　{s1}　{s2}　{s3}）"
 
 
@@ -1360,15 +1360,15 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     # 支払機関欄 (完全動的判定)
     pay_sec = detect_payment_section(spot_ws, img_coords)
     
-    target_ws["L214"] = "○1．" if pay_sec['pay_1'] else "1．"
-    target_ws["AH214"] = "○2．" if pay_sec['pay_2'] else "2．"
-    target_ws["L217"] = "○3．" if pay_sec['pay_3'] else "3．"
-    target_ws["AH217"] = "○4．" if pay_sec['pay_4'] else "4．"
+    target_ws["L214"] = "①" if pay_sec['pay_1'] else "1．"
+    target_ws["AH214"] = "②" if pay_sec['pay_2'] else "2．"
+    target_ws["L217"] = "③" if pay_sec['pay_3'] else "3．"
+    target_ws["AH217"] = "④" if pay_sec['pay_4'] else "4．"
     
-    target_ws["BD214"] = "○1.　普通" if pay_sec['dep_1'] else "1.　普通"
-    target_ws["BS214"] = "○2.　当座" if pay_sec['dep_2'] else "2.　当座"
-    target_ws["BD217"] = "○3.　通知" if pay_sec['dep_3'] else "3.　通知"
-    target_ws["BS217"] = "○4.　別段" if pay_sec['dep_4'] else "4.　別段"
+    target_ws["BD214"] = "① 普通" if pay_sec['dep_1'] else "1.　普通"
+    target_ws["BS214"] = "② 当座" if pay_sec['dep_2'] else "2.　当座"
+    target_ws["BD217"] = "③ 通知" if pay_sec['dep_3'] else "3.　通知"
+    target_ws["BS217"] = "④ 別段" if pay_sec['dep_4'] else "4.　別段"
     
     # 金融機関名（右側の入力枠 CW211:DQ219 に中央揃えで配置、長い名前も自動文字縮小対応）
     b_name = pay_sec['bank_name']
@@ -1725,15 +1725,15 @@ def convert_massage_dynamic(spot_ws, target_ws):
     # 支払機関欄 (完全動的判定)
     pay_sec = detect_payment_section(spot_ws, img_coords)
     
-    target_ws["L218"] = "○1．" if pay_sec['pay_1'] else "1．"
-    target_ws["AH218"] = "○2．" if pay_sec['pay_2'] else "2．"
-    target_ws["L221"] = "○3．" if pay_sec['pay_3'] else "3．"
-    target_ws["AH221"] = "○4．" if pay_sec['pay_4'] else "4．"
+    target_ws["L218"] = "①" if pay_sec['pay_1'] else "1．"
+    target_ws["AH218"] = "②" if pay_sec['pay_2'] else "2．"
+    target_ws["L221"] = "③" if pay_sec['pay_3'] else "3．"
+    target_ws["AH221"] = "④" if pay_sec['pay_4'] else "4．"
     
-    target_ws["BD218"] = "○1.　普通" if pay_sec['dep_1'] else "1.　普通"
-    target_ws["BS218"] = "○2.　当座" if pay_sec['dep_2'] else "2.　当座"
-    target_ws["BD221"] = "○3.　通知" if pay_sec['dep_3'] else "3.　通知"
-    target_ws["BS221"] = "○4.　別段" if pay_sec['dep_4'] else "4.　別段"
+    target_ws["BD218"] = "① 普通" if pay_sec['dep_1'] else "1.　普通"
+    target_ws["BS218"] = "② 当座" if pay_sec['dep_2'] else "2.　当座"
+    target_ws["BD221"] = "③ 通知" if pay_sec['dep_3'] else "3.　通知"
+    target_ws["BS221"] = "④ 別段" if pay_sec['dep_4'] else "4.　別段"
     
     # 金融機関名（右側の入力枠 CW215:DQ223 に中央揃えで配置、長い名前も自動文字縮小対応）
     b_name = pay_sec['bank_name']
