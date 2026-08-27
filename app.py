@@ -535,9 +535,9 @@ def safe_apply_grid_row(ws, start_r, end_r, price_val='', count_val='', total_va
     ws.merge_cells(start_row=start_r, start_column=c_m1_start, end_row=end_r, end_column=c_m1_end)
     ws.merge_cells(start_row=start_r, start_column=c_m2_start, end_row=end_r, end_column=c_m2_end)
     ws.merge_cells(start_row=start_r, start_column=c_m3_start, end_row=end_r, end_column=c_m3_end)
-    ws.cell(row=start_r, column=c_m1_start, value='円×').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
-    ws.cell(row=start_r, column=c_m2_start, value='回＝').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
-    ws.cell(row=start_r, column=c_m3_start, value='円').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+    ws.cell(row=start_r, column=c_m1_start, value='円×' if p1_str else '').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+    ws.cell(row=start_r, column=c_m2_start, value='回＝' if c1_str else '').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+    ws.cell(row=start_r, column=c_m3_start, value='円' if t1_str else '').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
     
     # 清掃: c_m3_start 以降のセル内容をクリアして円記号重複を完全防止
     for c_i in range(c_m3_start + 1, c_m3_end + 1):
@@ -1161,80 +1161,88 @@ def extract_middle_fees_dynamic(spot_ws):
     for r in range(65, 175):
         for c in range(1, 20):
             v = str(spot_ws.cell(row=r, column=c).value or '').replace(' ', '').replace('　', '')
+            
+            def get_c_cnt(row_idx):
+                return clean_amount(spot_ws.cell(row=row_idx, column=44).value or spot_ws.cell(row=row_idx, column=43).value or spot_ws.cell(row=row_idx, column=41).value or spot_ws.cell(row=row_idx, column=48).value)
+
             if '通所' in v and 'tuusho' not in fees:
                 fees['tuusho'] = {
                     'u_price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
-                    'u_count': clean_amount(spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=41).value),
+                    'u_count': get_c_cnt(r),
                     'u_total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
                     'l_price': clean_amount(spot_ws.cell(row=r+2, column=31).value or spot_ws.cell(row=r+2, column=30).value),
-                    'l_count': clean_amount(spot_ws.cell(row=r+2, column=44).value or spot_ws.cell(row=r+2, column=41).value),
+                    'l_count': get_c_cnt(r+2),
                     'l_total': clean_amount(spot_ws.cell(row=r+2, column=54).value or spot_ws.cell(row=r+2, column=53).value),
                 }
             elif ('訪問施術料１' in v or '訪問施術料1' in v) and 'h1' not in fees:
                 fees['h1'] = {
                     'u_price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
-                    'u_count': clean_amount(spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=41).value),
+                    'u_count': get_c_cnt(r),
                     'u_total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
                     'l_price': clean_amount(spot_ws.cell(row=r+2, column=31).value or spot_ws.cell(row=r+2, column=30).value),
-                    'l_count': clean_amount(spot_ws.cell(row=r+2, column=44).value or spot_ws.cell(row=r+2, column=41).value),
+                    'l_count': get_c_cnt(r+2),
                     'l_total': clean_amount(spot_ws.cell(row=r+2, column=54).value or spot_ws.cell(row=r+2, column=53).value),
                 }
             elif ('訪問施術料２' in v or '訪問施術料2' in v) and 'h2' not in fees:
                 fees['h2'] = {
                     'u_price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
-                    'u_count': clean_amount(spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=41).value),
+                    'u_count': get_c_cnt(r),
                     'u_total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
                     'l_price': clean_amount(spot_ws.cell(row=r+2, column=31).value or spot_ws.cell(row=r+2, column=30).value),
-                    'l_count': clean_amount(spot_ws.cell(row=r+2, column=44).value or spot_ws.cell(row=r+2, column=41).value),
+                    'l_count': get_c_cnt(r+2),
                     'l_total': clean_amount(spot_ws.cell(row=r+2, column=54).value or spot_ws.cell(row=r+2, column=53).value),
                 }
             elif ('訪問施術料３' in v or '訪問施術料3' in v) and 'h3' not in fees:
                 fees['h3'] = {
                     'u_price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
-                    'u_count': clean_amount(spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=41).value),
+                    'u_count': get_c_cnt(r),
                     'u_total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
                     'l_price': clean_amount(spot_ws.cell(row=r+2, column=31).value or spot_ws.cell(row=r+2, column=30).value),
-                    'l_count': clean_amount(spot_ws.cell(row=r+2, column=44).value or spot_ws.cell(row=r+2, column=41).value),
+                    'l_count': get_c_cnt(r+2),
                     'l_total': clean_amount(spot_ws.cell(row=r+2, column=54).value or spot_ws.cell(row=r+2, column=53).value),
                 }
             elif ('温罨法・電気光線' in v or '温罨法電気' in v) and 'on_den' not in fees:
                 fees['on_den'] = {
                     'price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
-                    'count': clean_amount(spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=41).value),
+                    'count': get_c_cnt(r),
                     'total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
                 }
             elif '温罨法' in v and 'on_an' not in fees and '電気' not in v:
                 fees['on_an'] = {
                     'price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
-                    'count': clean_amount(spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=41).value),
+                    'count': get_c_cnt(r),
                     'total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
                 }
             elif '電療料' in v and 'denryou' not in fees:
                 fees['denryou'] = {
                     'price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
-                    'count': clean_amount(spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=41).value),
+                    'count': get_c_cnt(r),
                     'total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
                 }
             elif '特別地域' in v and 'tokubetsu' not in fees:
                 fees['tokubetsu'] = {
                     'price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
-                    'count': clean_amount(spot_ws.cell(row=r, column=43).value or spot_ws.cell(row=r, column=41).value),
+                    'count': get_c_cnt(r),
                     'total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
                 }
             elif '往療料' in v and 'ouryou' not in fees:
                 fees['ouryou'] = {
                     'price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
-                    'count': clean_amount(spot_ws.cell(row=r, column=43).value or spot_ws.cell(row=r, column=41).value),
+                    'count': get_c_cnt(r),
                     'total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
                 }
-            elif '施術報告書交付料' in v and 'houkoku' not in fees:
+            elif ('施術報告書' in v or '報告書交付' in v) and 'houkoku' not in fees:
                 fees['houkoku'] = {
                     'price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
-                    'count': clean_amount(spot_ws.cell(row=r, column=44).value or spot_ws.cell(row=r, column=41).value),
+                    'count': get_c_cnt(r),
                     'total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
                 }
-            elif '明細書発行加算' in v and 'meisai' not in fees:
-                fees['meisai'] = clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value)
+            elif ('明細書' in v or '明細書発行' in v) and 'meisai' not in fees:
+                fees['meisai'] = {
+                    'price': clean_amount(spot_ws.cell(row=r, column=31).value or spot_ws.cell(row=r, column=30).value),
+                    'count': get_c_cnt(r),
+                    'total': clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value),
+                }
             elif ('合計' in v or '合　計' in v) and 'goukei' not in fees:
                 fees['goukei'] = clean_amount(spot_ws.cell(row=r, column=54).value or spot_ws.cell(row=r, column=53).value or spot_ws.cell(row=r, column=30).value)
             elif '一部負担金' in v and 'ichibu' not in fees:
@@ -1674,8 +1682,9 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
         safe_apply_grid_row(target_ws, 139, 143, tf['price'], tf['count'], tf['total'], is_boxed=False)
 
     # 明細書発行加算 (Row 144..148)
-    if 'meisai' in m_fees and m_fees['meisai'] is not None:
-        safe_apply_grid_row(target_ws, 144, 148, None, None, m_fees['meisai'], is_boxed=False)
+    if 'meisai' in m_fees and m_fees['meisai']:
+        tf = m_fees['meisai']
+        safe_apply_grid_row(target_ws, 144, 148, tf['price'], tf['count'], tf['total'], is_boxed=False)
 
     # 合計
     if 'goukei' in m_fees and m_fees['goukei'] is not None:
@@ -2057,8 +2066,9 @@ def convert_massage_dynamic(spot_ws, target_ws):
         safe_apply_grid_row(target_ws, 148, 151, tf['price'], tf['count'], tf['total'], is_boxed=False)
         
     # 明細書発行加算 (Row 152..155)
-    if 'meisai' in m_fees and m_fees['meisai'] is not None:
-        safe_apply_grid_row(target_ws, 152, 155, None, None, m_fees['meisai'], is_boxed=False)
+    if 'meisai' in m_fees and m_fees['meisai']:
+        tf = m_fees['meisai']
+        safe_apply_grid_row(target_ws, 152, 155, tf['price'], tf['count'], tf['total'], is_boxed=False)
 
     # 合計
     if 'goukei' in m_fees and m_fees['goukei'] is not None:
