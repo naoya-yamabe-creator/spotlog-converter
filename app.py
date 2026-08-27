@@ -1148,8 +1148,18 @@ def extract_calendar_marks_dynamic(spot_ws):
 
 def clean_amount(val):
     if val is None: return None
+    if isinstance(val, (int, float)):
+        if val == 0: return None
+        return int(round(val))
     s = str(val).strip()
-    if s in ['', '円', '0', '0円']: return None
+    if s in ['', '円', '0', '0円', '0.0']: return None
+    s_clean = s.replace('円', '').replace(',', '').strip()
+    try:
+        f_val = float(s_clean)
+        if f_val == 0: return None
+        return int(round(f_val))
+    except ValueError:
+        pass
     digits = re.sub(r'[^\d]', '', s)
     if digits: return int(digits)
     return None
