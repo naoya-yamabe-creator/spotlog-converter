@@ -1769,9 +1769,9 @@ def extract_kikan_code_dynamic(spot_ws):
                     val = spot_ws.cell(r, co).value
                     if val and str(val).strip() and str(val).strip() != '機関コード':
                         return str(val).strip()
-            elif re.search(r'^\d{3}-\d{3}$', v) or re.search(r'^\d{7,10}$', v) and c >= 45:
+            elif (re.search(r'^\d{3}-\d{3,4}$', v) or re.search(r'^\d{6,10}$', v)) and c >= 40:
                 return v
-    return spot_ws['AY8'].value or ""
+    return str(spot_ws['AY8'].value or "")
 
 
 def extract_claim_year_month_dynamic(spot_ws):
