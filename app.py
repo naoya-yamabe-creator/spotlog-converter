@@ -1300,103 +1300,183 @@ def extract_middle_fees_dynamic(spot_ws):
 def extract_cert_section_dynamic(spot_ws):
     """施術証明欄の郵便番号、年月日、所在地、施術所名、登録記号番号、管理者名、電話番号を動的抽出"""
     r_cert = None
-    for r in range(150, 210):
-        for c in range(1, 10):
-            v = str(spot_ws.cell(row=r, column=c).value or '')
+    for r in range(140, 220):
+        for c in range(1, 15):
+            v = str(spot_ws.cell(row=r, column=c).value or '').replace(' ', '').replace('　', '')
             if '施術証明' in v or '上記のとおり施術を行い' in v:
                 r_cert = r
                 break
         if r_cert: break
     if not r_cert: return {}
-
+    
     zip_val, date_val, addr_val, clinic_name, reg_no, manager_name, tel_val = None, None, None, None, None, None, None
-    for r in range(r_cert, r_cert + 16):
+    
+    for r in range(r_cert, min(r_cert + 25, spot_ws.max_row + 1)):
         for c in range(1, spot_ws.max_column + 1):
-            v = str(spot_ws.cell(row=r, column=c).value or '')
-            if '〒' in v and not zip_val: zip_val = v.strip()
-            elif ('令和' in v or '平成' in v) and not date_val and ('年' in v): date_val = v.strip()
-            elif ('Cote' in v or '区' in v or '市' in v or '県' in v) and not addr_val and c in [49, 50, 51, 52]: addr_val = v.strip()
-            elif re.search(r'\d{8}-\d-\d', v) and not reg_no: reg_no = v.strip()
-            elif ('管理者' in v or '氏名' in v) and not manager_name and c in [49, 50, 51, 52]: manager_name = v.strip()
-            elif ('ラプラス' in v or '施術所' in v) and not clinic_name and c in [49, 50, 51, 52]: clinic_name = v.strip()
-            elif ('TEL' in v or '電話' in v) and not tel_val:
-                for co in range(c+1, c+10):
+            raw_v = spot_ws.cell(row=r, column=c).value
+            if raw_v is None: continue
+            raw_str = str(raw_v).strip()
+            v = raw_str.replace(' ', '').replace('　', '')
+            
+            if ('〒' in raw_str or re.search(r'\b\d{3}-\d{4}\b', raw_str)) and not zip_val:
+                zip_val = raw_str
+                
+            if ('令和' in raw_str or '平成' in raw_str) and '年' in raw_str and '月' in raw_str and '日' in raw_str and c < 30 and not date_val:
+                date_val = raw_str
+                
+            if v == '所在地':
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    av = spot_ws.cell(row=r, column=co).value
+                    if av and str(av).strip() and str(av).strip() not in ['所在地', '住所', '施術所', ':']:
+                        addr_val = str(av).strip()
+                        break
+                        
+            if ('登録記号番号' in v or '登録番号' in v) and not reg_no:
+                for r_down in range(r + 1, r + 6):
+                    for c_near in range(max(1, c - 2), c + 6):
+                        rv = spot_ws.cell(row=r_down, column=c_near).value
+                        if rv and str(rv).strip():
+                            s_rv = str(rv).strip()
+                            if not any(k in s_rv for k in ['登録', '名称', '氏名', '管理者', '電話', '〒', '所在地', '住所']):
+                                reg_no = s_rv
+                                break
+                    if reg_no: break
+                    
+            if v in ['名称', '名・称', '施術所名', '施術所の名称'] and not clinic_name:
+                for co in range(c + 1, spot_ws.max_column + 1):
                     cv = spot_ws.cell(row=r, column=co).value
-                    if cv and str(cv).strip() and str(cv).strip() != '電話': tel_val = str(cv).strip(); break
-
-    if not clinic_name: clinic_name = spot_ws.cell(row=r_cert+10, column=51).value
-    if not manager_name: manager_name = spot_ws.cell(row=r_cert+14, column=51).value
-
+                    if cv and str(cv).strip() and str(cv).strip() not in ['名称', ':']:
+                        clinic_name = str(cv).strip()
+                        break
+                        
+            if ('施術管理者' in v or '管理者' in v) and not manager_name:
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    mv = spot_ws.cell(row=r, column=co).value
+                    if mv and str(mv).strip() and str(mv).strip() not in ['氏名', '氏　名', '管理者', '施術管理者', '電話', ':']:
+                        manager_name = str(mv).strip()
+                        break
+                        
+            if ('電話' in v or 'TEL' in v.upper()) and not tel_val:
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    tv = spot_ws.cell(row=r, column=co).value
+                    if tv and str(tv).strip() and re.search(r'[\d-]{8,}', str(tv).strip()):
+                        tel_val = str(tv).strip()
+                        break
+                        
     return {
-        'zip': zip_val,
-        'date': date_val,
-        'addr': addr_val,
-        'clinic_name': clinic_name,
-        'reg_no': reg_no,
-        'manager_name': manager_name,
-        'tel': tel_val
+        'zip': zip_val, 'date': date_val, 'addr': addr_val,
+        'clinic_name': clinic_name, 'reg_no': reg_no,
+        'manager_name': manager_name, 'tel': tel_val
     }
 
 
 def extract_applicant_section_dynamic(spot_ws):
     """申請欄の郵便番号、申請日、住所、広域連合名、申請者氏名、電話番号を動的抽出"""
     r_app = None
-    for r in range(175, 220):
-        for c in range(1, 10):
-            v = str(spot_ws.cell(row=r, column=c).value or '')
+    for r in range(175, 225):
+        for c in range(1, 15):
+            v = str(spot_ws.cell(row=r, column=c).value or '').replace(' ', '').replace('　', '')
             if '申請欄' in v or '上記の療養に要した費用' in v:
                 r_app = r
                 break
         if r_app: break
     if not r_app: return {}
-
+    
     zip_val, date_val, addr_val, kouiki_val, name_val, tel_val = None, None, None, None, None, None
-    for r in range(r_app, r_app + 14):
+    
+    for r in range(r_app, min(r_app + 20, spot_ws.max_row + 1)):
         for c in range(1, spot_ws.max_column + 1):
-            v = str(spot_ws.cell(row=r, column=c).value or '')
-            if '〒' in v and not zip_val: zip_val = v.strip()
-            elif ('令和' in v or '平成' in v) and not date_val and ('年' in v): date_val = v.strip()
-            elif '殿' in v or '広域連合' in v: kouiki_val = v.strip()
-            elif c in [49, 50, 51, 52] and ('市' in v or '区' in v or '県' in v) and not addr_val: addr_val = v.strip()
-            elif c in [49, 50, 51, 52] and len(v.strip()) >= 2 and not any(k in v for k in ['〒', '市', '区', '県', '番号', '電話', '殿']) and not name_val:
-                name_val = v.strip()
-            elif ('TEL' in v or '電話' in v) and not tel_val:
-                for co in range(c+1, c+10):
-                    cv = spot_ws.cell(row=r, column=co).value
-                    if cv and str(cv).strip() and str(cv).strip() != '電話': tel_val = str(cv).strip(); break
-
+            raw_v = spot_ws.cell(row=r, column=c).value
+            if raw_v is None: continue
+            raw_str = str(raw_v).strip()
+            v = raw_str.replace(' ', '').replace('　', '')
+            
+            if ('〒' in raw_str or re.search(r'\b\d{3}-\d{4}\b', raw_str)) and not zip_val:
+                zip_val = raw_str
+                
+            if ('令和' in raw_str or '平成' in raw_str) and '年' in raw_str and '月' in raw_str and '日' in raw_str and c < 30 and not date_val:
+                date_val = raw_str
+                
+            if '殿' in raw_str or '広域連合' in raw_str or '健康保険組合' in raw_str:
+                kouiki_val = raw_str
+                
+            if v == '住所' and not addr_val:
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    av = spot_ws.cell(row=r, column=co).value
+                    if av and str(av).strip() and str(av).strip() not in ['住所', '申請者', '（被保険者）', ':']:
+                        addr_val = str(av).strip()
+                        break
+                        
+            if v in ['氏名', '氏・名'] and not name_val:
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    nv = spot_ws.cell(row=r, column=co).value
+                    if nv and str(nv).strip() and str(nv).strip() not in ['氏名', '氏　名', '住所', '申請者', '（被保険者）', '電話', ':']:
+                        name_val = str(nv).strip()
+                        break
+                        
+            if ('電話' in v or 'TEL' in v.upper()) and not tel_val:
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    tv = spot_ws.cell(row=r, column=co).value
+                    if tv and str(tv).strip() and re.search(r'[\d-]{8,}', str(tv).strip()):
+                        tel_val = str(tv).strip()
+                        break
+                        
     return {
-        'zip': zip_val,
-        'date': date_val,
-        'addr': addr_val,
-        'kouiki': kouiki_val,
-        'name': name_val,
-        'tel': tel_val
+        'zip': zip_val, 'date': date_val, 'addr': addr_val,
+        'kouiki': kouiki_val, 'name': name_val, 'tel': tel_val
     }
 
 
 def extract_delegation_section_dynamic(spot_ws):
     """代理人受領委任欄の委任日、申請者住所・氏名、代理人（足森様）住所・氏名を動的抽出"""
     r_del = None
-    for r in range(215, 255):
-        for c in range(1, 10):
-            v = str(spot_ws.cell(row=r, column=c).value or '')
+    for r in range(210, 255):
+        for c in range(1, 15):
+            v = str(spot_ws.cell(row=r, column=c).value or '').replace(' ', '').replace('　', '')
             if '本申請書に基づく給付金' in v or '受領を代理人に委任' in v:
                 r_del = r
                 break
         if r_del: break
     if not r_del: return {}
-
-    date_val = spot_ws.cell(row=r_del, column=50).value or spot_ws.cell(row=r_del, column=48).value or spot_ws.cell(row=r_del, column=46).value
-    applicant_addr = spot_ws.cell(row=r_del+3, column=18).value
-    delegate_addr = spot_ws.cell(row=r_del+3, column=53).value
     
-    applicant_name, delegate_name = None, None
-    for ro in range(r_del+5, r_del+13):
-        v1 = spot_ws.cell(row=ro, column=18).value
-        v2 = spot_ws.cell(row=ro, column=53).value
-        if v1 and str(v1).strip() and not applicant_name: applicant_name = str(v1).strip()
-        if v2 and str(v2).strip() and not delegate_name: delegate_name = str(v2).strip()
+    date_val = None
+    applicant_addr = None
+    delegate_addr = None
+    applicant_name = None
+    delegate_name = None
+    
+    for c in range(35, spot_ws.max_column + 1):
+        dv = spot_ws.cell(row=r_del, column=c).value
+        if dv and ('令和' in str(dv) or '平成' in str(dv)):
+            date_val = str(dv).strip()
+            break
+            
+    for r in range(r_del + 1, min(r_del + 20, spot_ws.max_row + 1)):
+        for c in range(1, spot_ws.max_column + 1):
+            raw_v = spot_ws.cell(row=r, column=c).value
+            if raw_v is None: continue
+            raw_str = str(raw_v).strip()
+            v = raw_str.replace(' ', '').replace('　', '')
+            
+            if v == '住所':
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    av = spot_ws.cell(row=r, column=co).value
+                    if av and str(av).strip() and str(av).strip() not in ['住所', '代理人', '申請者']:
+                        if c < 40 and not applicant_addr:
+                            applicant_addr = str(av).strip()
+                        elif c >= 40 and not delegate_addr:
+                            delegate_addr = str(av).strip()
+                        break
+                        
+            if v == '氏名':
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    nv = spot_ws.cell(row=r, column=co).value
+                    if nv and str(nv).strip() and str(nv).strip() not in ['氏名', '氏　名', '住所', '代理人', '申請者', '（被保険者）']:
+                        if c < 40 and not applicant_name:
+                            applicant_name = str(nv).strip()
+                        elif c >= 40 and not delegate_name:
+                            delegate_name = str(nv).strip()
+                        break
 
     return {
         'date': date_val,
