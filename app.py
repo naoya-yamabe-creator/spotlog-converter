@@ -678,7 +678,17 @@ def detect_work_injury(ws, img_coords):
     r2 = any((r, c) in img_coords for r in range(38, 43) for c in range(50, 59))
     r3 = any((r, c) in img_coords for r in range(38, 43) for c in range(60, 72))
     
-    other_val = str(ws["BL40"].value or "")
+    other_val = ""
+    for r in range(35, 48):
+        for c in range(30, ws.max_column + 1):
+            v = str(ws.cell(r, c).value or '')
+            if 'その他' in v:
+                other_val = v
+                break
+        if other_val: break
+    if not other_val:
+        other_val = str(ws["BL40"].value or "")
+        
     m = re.search(r'[（(](.*?)[)）]', other_val)
     inside_txt = m.group(1) if m else "　不　詳　"
     if not inside_txt.strip():
@@ -771,15 +781,25 @@ def detect_practitioner_location_type(ws, img_coords):
 
 def detect_electrotherapy(ws, img_coords):
     """電療料（加算／ 1電気針 2電気温灸器 3電気光線器具）の丸囲みを動的判定"""
-    r = 125
-    opt1 = any((r_i, c_i) in img_coords for r_i in range(123, 127) for c_i in range(15, 23))
-    opt2 = any((r_i, c_i) in img_coords for r_i in range(123, 127) for c_i in range(23, 30))
-    opt3 = any((r_i, c_i) in img_coords for r_i in range(123, 127) for c_i in range(30, 39))
+    r_found = None
+    for r in range(110, 145):
+        for c in range(1, 20):
+            v = str(ws.cell(row=r, column=c).value or '').replace(' ', '')
+            if '電療料' in v:
+                r_found = r
+                break
+        if r_found: break
+    if not r_found: r_found = 125
     
-    val = str(ws.cell(row=r, column=9).value or '')
-    if '○１' in val or '①' in val: opt1 = True
-    if '○２' in val or '②' in val: opt2 = True
-    if '○３' in val or '③' in val: opt3 = True
+    opt1 = any((r_i, c_i) in img_coords for r_i in range(r_found - 2, r_found + 3) for c_i in range(15, 23))
+    opt2 = any((r_i, c_i) in img_coords for r_i in range(r_found - 2, r_found + 3) for c_i in range(23, 30))
+    opt3 = any((r_i, c_i) in img_coords for r_i in range(r_found - 2, r_found + 3) for c_i in range(30, 39))
+    
+    for c in range(1, ws.max_column + 1):
+        val = str(ws.cell(row=r_found, column=c).value or '')
+        if '○１' in val or '①' in val or '○1' in val: opt1 = True
+        if '○２' in val or '②' in val or '○2' in val: opt2 = True
+        if '○３' in val or '③' in val or '○3' in val: opt3 = True
     
     s1 = '① 電気針' if opt1 else '１電気針'
     s2 = '② 電気温灸器' if opt2 else '２電気温灸器'
@@ -788,9 +808,20 @@ def detect_electrotherapy(ws, img_coords):
 
 
 def extract_report_prev_date(ws, is_massage=False):
-    """施術報告書交付料（前回支給：　年　月分）の年月テキストを抽出"""
-    target_row = 152 if is_massage else 137
-    for c in range(18, 30):
+    """施術報告書交付料（前回支給：　年　月分）の年月テキストを動的抽出"""
+    target_row = None
+    for r in range(120, 175):
+        for c in range(1, 20):
+            v = str(ws.cell(row=r, column=c).value or '').replace(' ', '')
+            if '施術報告書' in v or '報告書交付' in v:
+                target_row = r
+                break
+        if target_row: break
+        
+    if not target_row:
+        target_row = 152 if is_massage else 137
+        
+    for c in range(10, 40):
         v = ws.cell(row=target_row, column=c).value
         if v and str(v).strip():
             str_v = str(v).strip()
