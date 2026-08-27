@@ -1280,8 +1280,11 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     target_ws["O124"] = detect_electrotherapy(spot_ws, img_coords)
     safe_apply_grid_row(target_ws, 124, 128, spot_ws["AE125"].value, spot_ws["AR125"].value, spot_ws["BB125"].value, is_boxed=False)
 
-    # 特別地域 (加算 Row 134..138)
-    safe_apply_grid_row(target_ws, 134, 138, '', '', '', is_boxed=False)
+    # 特別地域 (加算 Row 129..133)
+    safe_apply_grid_row(target_ws, 129, 133, spot_ws["AE131"].value, spot_ws["AQ131"].value, spot_ws["BB131"].value, is_boxed=False)
+
+    # 往療料 (Row 134..138)
+    safe_apply_grid_row(target_ws, 134, 138, spot_ws["AE134"].value, spot_ws["AQ134"].value, spot_ws["BB134"].value, is_boxed=False)
 
     # 施術報告書交付料（前回支給年月 動的判定 Row 139..143）
     prev_ym_hari = extract_report_prev_date(spot_ws, is_massage=False)
@@ -1602,14 +1605,14 @@ def convert_massage_dynamic(spot_ws, target_ws):
     target_ws["DE84"] = str(spot_ws["BF71"].value or "")
     target_ws["DE84"].alignment = Alignment(horizontal="center", vertical="center")
 
-    # 通所 (Row 88..95: 格子ボックス配置)
+    # 通所 (Row 88..95: 訪問施術料1と完全に揃えた格子・列配置)
     u_p = spot_ws["AD74"].value
     u_c = spot_ws["AO74"].value or spot_ws["AR74"].value
     u_t = spot_ws["BA74"].value or spot_ws["AD74"].value
     l_p = spot_ws["AD76"].value if spot_ws["AD76"].value else None
     l_c = (spot_ws["AO76"].value or spot_ws["AR76"].value) if spot_ws["AD76"].value else None
     l_t = spot_ws["BA76"].value if spot_ws["AD76"].value else None
-    safe_apply_grid_row(target_ws, 88, 95, u_p, u_c, u_t, l_p, l_c, l_t, is_boxed=True)
+    safe_apply_grid_row(target_ws, 88, 95, u_p, u_c, u_t, l_p, l_c, l_t, is_boxed=False)
 
     # 訪問施術料１ (Row 96..103: 列位置完全一致)
     safe_apply_grid_row(target_ws, 96, 103,
