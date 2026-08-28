@@ -495,7 +495,7 @@ def safe_apply_grid_row(ws, start_r, end_r, price_val='', count_val='', total_va
             cell.border = openpyxl.styles.Border(top=t_s, bottom=b_s, left=l_s, right=r_s)
             cell.font = font_ms
 
-    has_two = price_val2 and str(price_val2).strip() not in ['', '0', '0円']
+    has_two = (end_r - start_r + 1) >= 6
     
     p1_str = format_currency_str(price_val) if price_val else ''
     c1_str = str(count_val) if (count_val is not None and str(count_val).strip() != '') else ''
@@ -511,33 +511,46 @@ def safe_apply_grid_row(ws, start_r, end_r, price_val='', count_val='', total_va
         ws.merge_cells(start_row=start_r, start_column=c_p_start, end_row=mid_r-1, end_column=c_p_end)
         ws.merge_cells(start_row=start_r, start_column=c_c_start, end_row=mid_r-1, end_column=c_c_end)
         ws.merge_cells(start_row=start_r, start_column=c_t_start, end_row=mid_r-1, end_column=c_t_end)
+        ws.merge_cells(start_row=start_r, start_column=c_m1_start, end_row=mid_r-1, end_column=c_m1_end)
+        ws.merge_cells(start_row=start_r, start_column=c_m2_start, end_row=mid_r-1, end_column=c_m2_end)
+        ws.merge_cells(start_row=start_r, start_column=c_m3_start, end_row=mid_r-1, end_column=c_m3_end)
+
         ws.cell(row=start_r, column=c_p_start, value=p1_str).alignment = openpyxl.styles.Alignment(horizontal='right', vertical='center')
         ws.cell(row=start_r, column=c_c_start, value=c1_str).alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
         ws.cell(row=start_r, column=c_t_start, value=t1_str).alignment = openpyxl.styles.Alignment(horizontal='right', vertical='center')
+        ws.cell(row=start_r, column=c_m1_start, value='円×').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+        ws.cell(row=start_r, column=c_m2_start, value='回＝').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+        ws.cell(row=start_r, column=c_m3_start, value='円').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
 
         # 下段
         ws.merge_cells(start_row=mid_r, start_column=c_p_start, end_row=end_r, end_column=c_p_end)
         ws.merge_cells(start_row=mid_r, start_column=c_c_start, end_row=end_r, end_column=c_c_end)
         ws.merge_cells(start_row=mid_r, start_column=c_t_start, end_row=end_r, end_column=c_t_end)
+        ws.merge_cells(start_row=mid_r, start_column=c_m1_start, end_row=end_r, end_column=c_m1_end)
+        ws.merge_cells(start_row=mid_r, start_column=c_m2_start, end_row=end_r, end_column=c_m2_end)
+        ws.merge_cells(start_row=mid_r, start_column=c_m3_start, end_row=end_r, end_column=c_m3_end)
+
         ws.cell(row=mid_r, column=c_p_start, value=p2_str).alignment = openpyxl.styles.Alignment(horizontal='right', vertical='center')
         ws.cell(row=mid_r, column=c_c_start, value=c2_str).alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
         ws.cell(row=mid_r, column=c_t_start, value=t2_str).alignment = openpyxl.styles.Alignment(horizontal='right', vertical='center')
+        ws.cell(row=mid_r, column=c_m1_start, value='円×').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+        ws.cell(row=mid_r, column=c_m2_start, value='回＝').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+        ws.cell(row=mid_r, column=c_m3_start, value='円').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
     else:
-        # 1段（中央の横線なし）
+        # 1段
         ws.merge_cells(start_row=start_r, start_column=c_p_start, end_row=end_r, end_column=c_p_end)
         ws.merge_cells(start_row=start_r, start_column=c_c_start, end_row=end_r, end_column=c_c_end)
         ws.merge_cells(start_row=start_r, start_column=c_t_start, end_row=end_r, end_column=c_t_end)
+        ws.merge_cells(start_row=start_r, start_column=c_m1_start, end_row=end_r, end_column=c_m1_end)
+        ws.merge_cells(start_row=start_r, start_column=c_m2_start, end_row=end_r, end_column=c_m2_end)
+        ws.merge_cells(start_row=start_r, start_column=c_m3_start, end_row=end_r, end_column=c_m3_end)
+
         ws.cell(row=start_r, column=c_p_start, value=p1_str).alignment = openpyxl.styles.Alignment(horizontal='right', vertical='center')
         ws.cell(row=start_r, column=c_c_start, value=c1_str).alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
         ws.cell(row=start_r, column=c_t_start, value=t1_str).alignment = openpyxl.styles.Alignment(horizontal='right', vertical='center')
-
-    # 記号枠（円×, 回＝, 円 は値の有無に関わらず常に表示）
-    ws.merge_cells(start_row=start_r, start_column=c_m1_start, end_row=end_r, end_column=c_m1_end)
-    ws.merge_cells(start_row=start_r, start_column=c_m2_start, end_row=end_r, end_column=c_m2_end)
-    ws.merge_cells(start_row=start_r, start_column=c_m3_start, end_row=end_r, end_column=c_m3_end)
-    ws.cell(row=start_r, column=c_m1_start, value='円×').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
-    ws.cell(row=start_r, column=c_m2_start, value='回＝').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
-    ws.cell(row=start_r, column=c_m3_start, value='円').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+        ws.cell(row=start_r, column=c_m1_start, value='円×').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+        ws.cell(row=start_r, column=c_m2_start, value='回＝').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+        ws.cell(row=start_r, column=c_m3_start, value='円').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
     
     # 清掃: c_m3_start 以降のセル内容をクリアして円記号重複を完全防止
     for c_i in range(c_m3_start + 1, c_m3_end + 1):
@@ -665,25 +678,27 @@ def detect_special_marks(ws, img_coords):
 
 
 def extract_copayment_ratio_text(ws, marks):
-    """一部負担金の割合（1割・2割・3割）を動的判定"""
-    for r in range(145, 170):
-        for c in range(1, 30):
-            v = str(ws.cell(row=r, column=c).value or '')
-            if '2割' in v or '２割' in v:
+    """一部負担金の割合（1割・2割・3割）を動的判定（給付割合8割/9割/10割・パーセント・割合表記を完全網羅）"""
+    # 1. シート内の「一部負担金」行周辺のテキスト判定
+    for r in range(130, ws.max_row + 1):
+        row_str = "".join([str(ws.cell(row=r, column=c).value or '') for c in range(1, 35)])
+        if '一部負担' in row_str:
+            if any(k in row_str for k in ['2割', '２割', '20%']):
                 return "一部負担金（１ 割 ・ ② 割 ・ ３ 割）"
-            elif '3割' in v or '３割' in v:
+            elif any(k in row_str for k in ['3割', '３割', '30%']):
                 return "一部負担金（１ 割 ・ ２ 割 ・ ③ 割）"
-            elif '1割' in v or '１割' in v:
+            elif any(k in row_str for k in ['1割', '１割', '10%']):
                 return "一部負担金（① 割 ・ ２ 割 ・ ３ 割）"
-                
+
+    # 2. 上部ヘッダーの給付割合（8: 2割負担, 9: 1割負担, 7/10: 3割/10割負担）
     if '⑧' in marks.get('rate_8', ''):
         return "一部負担金（１ 割 ・ ② 割 ・ ３ 割）"
-    elif '⑩' in marks.get('rate_10', ''):
-        return "一部負担金（１ 割 ・ ２ 割 ・ ③ 割）"
     elif '⑨' in marks.get('rate_9', ''):
         return "一部負担金（① 割 ・ ２ 割 ・ ３ 割）"
+    elif '⑩' in marks.get('rate_10', ''):
+        return "一部負担金（１ 割 ・ ２ 割 ・ ③ 割）"
         
-    return "一部負担金（１ 割 ・ ２ 割 ・ ３ 割）"
+    return "一部負担金（① 割 ・ ２ 割 ・ ３ 割）"
 
 
 def detect_work_injury(ws, img_coords):
@@ -1036,9 +1051,9 @@ def detect_payment_section(ws, img_coords):
         dep_1 = True
 
     is_post_office = any(k in bank_name or k in bank_type_raw or k in branch_name for k in ['郵便局', 'ゆうちょ'])
-    if is_post_office:
-        pay_3 = True
-        pay_1 = False
+    # ゆうちょ銀行口座への振込は「①．振込」、郵便局送金（窓口払出等）指定時のみ「③．郵便局送金」
+    if is_post_office and not pay_3:
+        pay_1 = True
 
     return {
         'bank_name': bank_name,
@@ -1425,6 +1440,17 @@ def extract_middle_fees_dynamic(spot_ws):
                 fees['on_den'] = parse_fee_row_smart(spot_ws, r)
             elif '温罨法' in v and 'on_an' not in fees and '電気' not in v:
                 fees['on_an'] = parse_fee_row_smart(spot_ws, r)
+            elif ('変形徒手' in v or '変形' in v) and 'henkei' not in fees:
+                # 変形徒手矯正術の金額行（同一行または直近行を動的探索）
+                h_fee = None
+                for r_h in range(r, min(spot_ws.max_row + 1, r + 10)):
+                    parsed = parse_fee_row_smart(spot_ws, r_h)
+                    if parsed['price'] is not None or parsed['count'] is not None or parsed['total'] is not None:
+                        h_fee = parsed
+                        break
+                if not h_fee:
+                    h_fee = parse_fee_row_smart(spot_ws, r + 6)
+                fees['henkei'] = h_fee
             elif '電療料' in v and 'denryou' not in fees:
                 fees['denryou'] = parse_fee_row_smart(spot_ws, r)
             elif '特別地域' in v and 'tokubetsu' not in fees:
@@ -1978,16 +2004,12 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     """はり・きゅう用の完全正確配置転記（全行の「円×」「回＝」「円」列位置を完全垂直一致）"""
     img_coords = get_image_anchors(spot_ws)
     
-    # 1. タイトル年月 & カレンダー月（完全動的抽出）
-    val_ym = extract_claim_year_month_dynamic(spot_ws)
+    # 1. タイトル年月 & カレンダー月（完全動的抽出・施術月最優先同期）
     p_days = extract_period_and_days_dynamic(spot_ws)
+    val_ym = extract_claim_year_month_dynamic(spot_ws)
     
     month_num = ""
-    if val_ym:
-        m_match = re.search(r'(\d+)\s*月', str(val_ym))
-        if m_match:
-            month_num = m_match.group(1)
-    if not month_num and p_days.get('from_date'):
+    if p_days.get('from_date'):
         m_match = re.search(r'(\d+)\s*月', str(p_days['from_date']))
         if m_match:
             month_num = m_match.group(1)
@@ -1995,8 +2017,15 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
         m_match = re.search(r'(\d+)\s*月', str(p_days['to_date']))
         if m_match:
             month_num = m_match.group(1)
+    if not month_num and val_ym:
+        m_match = re.search(r'(\d+)\s*月', str(val_ym))
+        if m_match:
+            month_num = m_match.group(1)
 
-    if val_ym:
+    if month_num and val_ym:
+        str_ym = re.sub(r'\d+\s*月', f"{month_num}月", str(val_ym))
+        target_ws["E5"] = f"療 養 費 支 給 申 請 書{str_ym}（はり・きゅう用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{str_ym}）（はり・きゅう用）"
+    elif val_ym:
         str_ym = str(val_ym)
         target_ws["E5"] = f"療 養 費 支 給 申 請 書{val_ym}（はり・きゅう用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{val_ym}）（はり・きゅう用）"
     elif month_num:
@@ -2372,16 +2401,12 @@ def convert_massage_dynamic(spot_ws, target_ws):
     """あんま・マッサージ用の完全正確配置転記（全行の「円×」「回＝」「円」列位置を完全垂直一致）"""
     img_coords = get_image_anchors(spot_ws)
     
-    # 1. タイトル年月 & カレンダー月（完全動的抽出）
-    val_ym = extract_claim_year_month_dynamic(spot_ws)
+    # 1. タイトル年月 & カレンダー月（完全動的抽出・施術月最優先同期）
     p_days = extract_period_and_days_dynamic(spot_ws)
+    val_ym = extract_claim_year_month_dynamic(spot_ws)
     
     month_num = ""
-    if val_ym:
-        m_match = re.search(r'(\d+)\s*月', str(val_ym))
-        if m_match:
-            month_num = m_match.group(1)
-    if not month_num and p_days.get('from_date'):
+    if p_days.get('from_date'):
         m_match = re.search(r'(\d+)\s*月', str(p_days['from_date']))
         if m_match:
             month_num = m_match.group(1)
@@ -2389,8 +2414,15 @@ def convert_massage_dynamic(spot_ws, target_ws):
         m_match = re.search(r'(\d+)\s*月', str(p_days['to_date']))
         if m_match:
             month_num = m_match.group(1)
+    if not month_num and val_ym:
+        m_match = re.search(r'(\d+)\s*月', str(val_ym))
+        if m_match:
+            month_num = m_match.group(1)
 
-    if val_ym:
+    if month_num and val_ym:
+        str_ym = re.sub(r'\d+\s*月', f"{month_num}月", str(val_ym))
+        target_ws["E5"] = f"療 養 費 支 給 申 請 書{str_ym}（あんま・マッサージ用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{str_ym}）（あんま・マッサージ用）"
+    elif val_ym:
         str_ym = str(val_ym)
         target_ws["E5"] = f"療 養 費 支 給 申 請 書{val_ym}（あんま・マッサージ用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{val_ym}）（あんま・マッサージ用）"
     elif month_num:
