@@ -1338,6 +1338,8 @@ def clean_amount(val):
         return int(round(val))
     s = str(val).strip()
     if s in ['', '円', '0', '0円', '0.0']: return None
+    if any(k in s for k in ['訪問', '施術', '人', '加算', '料', '逓減', '割', '初療', '負担', '交付', '発行', '地域', '部位', '回数', '同意']):
+        return None
     s_clean = s.replace('円', '').replace(',', '').replace(' ', '').replace('　', '').strip()
     try:
         f_val = float(s_clean)
@@ -1345,8 +1347,6 @@ def clean_amount(val):
         return int(round(f_val))
     except ValueError:
         pass
-    digits = re.sub(r'[^\d]', '', s_clean)
-    if digits: return int(digits)
     return None
 
 
@@ -1370,14 +1370,15 @@ def parse_fee_row_smart(spot_ws, r):
             col_yen_end = c
             
     if col_yen_x:
-        for c in range(col_yen_x - 1, 5, -1):
+        # 列15以降（見出しテキスト列L=12等を除外）から単価を探索
+        for c in range(col_yen_x - 1, 14, -1):
             val = clean_amount(spot_ws.cell(r, c).value)
             if val is not None:
                 price = val
                 break
                 
     if col_kai_eq:
-        start_c = col_yen_x if col_yen_x else 5
+        start_c = col_yen_x if col_yen_x else 14
         for c in range(col_kai_eq - 1, start_c, -1):
             val = clean_amount(spot_ws.cell(r, c).value)
             if val is not None:
@@ -1392,7 +1393,7 @@ def parse_fee_row_smart(spot_ws, r):
                 total = val
                 break
     else:
-        for c in range(10, spot_ws.max_column + 1):
+        for c in range(15, spot_ws.max_column + 1):
             val = clean_amount(spot_ws.cell(r, c).value)
             if val is not None:
                 total = val
