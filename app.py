@@ -1331,23 +1331,31 @@ def extract_calendar_marks_dynamic(spot_ws):
     return cal_data
 
 
-def clean_amount(val):
-    if val is None: return None
+def clean_amount_list(val):
+    if val is None: return []
     if isinstance(val, (int, float)):
-        if val == 0: return None
-        return int(round(val))
+        if val == 0: return []
+        return [int(round(val))]
     s = str(val).strip()
-    if s in ['', '円', '0', '0円', '0.0']: return None
+    if s in ['', '円', '0', '0円', '0.0']: return []
     if any(k in s for k in ['訪問', '施術', '人', '加算', '料', '逓減', '割', '初療', '負担', '交付', '発行', '地域', '部位', '回数', '同意']):
-        return None
-    s_clean = s.replace('円', '').replace(',', '').replace(' ', '').replace('　', '').strip()
-    try:
-        f_val = float(s_clean)
-        if f_val == 0: return None
-        return int(round(f_val))
-    except ValueError:
-        pass
-    return None
+        return []
+    lines = s.split('\n')
+    results = []
+    for line in lines:
+        s_clean = line.replace('円', '').replace(',', '').replace(' ', '').replace('　', '').strip()
+        try:
+            f_val = float(s_clean)
+            if f_val != 0:
+                results.append(int(round(f_val)))
+        except ValueError:
+            pass
+    return results
+
+
+def clean_amount(val):
+    res = clean_amount_list(val)
+    return res[0] if res else None
 
 
 def parse_fee_row_smart(spot_ws, r):
@@ -1370,7 +1378,6 @@ def parse_fee_row_smart(spot_ws, r):
             col_yen_end = c
             
     if col_yen_x:
-        # 列15以降（見出しテキスト列L=12等を除外）から単価を探索
         for c in range(col_yen_x - 1, 14, -1):
             val = clean_amount(spot_ws.cell(r, c).value)
             if val is not None:
@@ -1399,137 +1406,88 @@ def parse_fee_row_smart(spot_ws, r):
                 total = val
                 break
                 
-    # 単価・回数・合計の補完・整合性計算（式と金額を完全成立）
-    if total is not None and count is not None and count > 0 and (price is None or price * count != total):
-        price = total // count
-    elif total is None and price is not None and count is not None:
-        total = price * count
-    elif count is None and total is not None and price is not None and price > 0:
-        count = total // price
-        
     return {'price': price, 'count': count, 'total': total}
 
 
 def extract_middle_fees_dynamic(spot_ws):
     """通所、訪問施術料1〜3、電療料、温罨法、特別地域、変形徒手、往療料、施術報告書交付料、明細書発行加算、合計、一部負担金、請求額をタテ・ヨコ完全動的抽出"""
     fees = {}
+
+    def parse_multi_tier_section(start_r, stop_keywords):
+        collected_rows = []
+        for r in range(start_r, min(spot_ws.max_row + 1, start_r + 6)):
+            if r > start_r:
+                label_check = str(spot_ws.cell(r, 6).value or '') + str(spot_ws.cell(r, 12).value or '')
+                if any(k in label_check for k in stop_keywords):
+                    break
+                    
+            row_cells = [(c, spot_ws.cell(r, c).value) for c in range(1, spot_ws.max_column + 1) if spot_ws.cell(r, c).value is not None]
+            col_yen_x = None
+            col_kai_eq = None
+            col_yen_end = None
+            
+            for c, v in row_cells:
+                s = str(v).replace(' ', '').replace('　', '')
+                if '円×' in s or '円*' in s:
+                    col_yen_x = c
+                elif '回＝' in s or '回=' in s:
+                    col_kai_eq = c
+                elif s == '円' and col_kai_eq and c > col_kai_eq:
+                    col_yen_end = c
+                    
+            prices, counts, totals = [], [], []
+            if col_yen_x:
+                for c in range(col_yen_x - 1, 14, -1):
+                    vals = clean_amount_list(spot_ws.cell(r, c).value)
+                    if vals:
+                        prices = vals
+                        break
+            if col_kai_eq:
+                start_c = col_yen_x if col_yen_x else 14
+                for c in range(col_kai_eq - 1, start_c, -1):
+                    vals = clean_amount_list(spot_ws.cell(r, c).value)
+                    if vals:
+                        counts = vals
+                        break
+            if col_kai_eq:
+                end_c = col_yen_end if col_yen_end else spot_ws.max_column + 1
+                for c in range(col_kai_eq + 1, end_c):
+                    vals = clean_amount_list(spot_ws.cell(r, c).value)
+                    if vals:
+                        totals = vals
+                        break
+                        
+            n_lines = max(len(prices), len(counts), len(totals))
+            if n_lines > 0:
+                for idx in range(n_lines):
+                    p = prices[idx] if idx < len(prices) else None
+                    cnt = counts[idx] if idx < len(counts) else None
+                    tot = totals[idx] if idx < len(totals) else None
+                    if p is not None or cnt is not None or tot is not None:
+                        collected_rows.append({'price': p, 'count': cnt, 'total': tot})
+                        
+        if not collected_rows:
+            return {'u_price': None, 'u_count': None, 'u_total': None, 'l_price': None, 'l_count': None, 'l_total': None}
+        elif len(collected_rows) == 1:
+            r1 = collected_rows[0]
+            return {'u_price': r1['price'], 'u_count': r1['count'], 'u_total': r1['total'], 'l_price': None, 'l_count': None, 'l_total': None}
+        else:
+            r1 = collected_rows[0]
+            r2 = collected_rows[1]
+            return {'u_price': r1['price'], 'u_count': r1['count'], 'u_total': r1['total'], 'l_price': r2['price'], 'l_count': r2['count'], 'l_total': r2['total']}
+
     for r in range(40, spot_ws.max_row + 1):
         for c in range(1, 20):
             v = str(spot_ws.cell(row=r, column=c).value or '').replace(' ', '').replace('　', '')
 
             if '通所' in v and 'tuusho' not in fees:
-                u_row = parse_fee_row_smart(spot_ws, r)
-                l_row = {'price': None, 'count': None, 'total': None}
-                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 5)):
-                    ro_text = str(spot_ws.cell(row=ro, column=c).value or '')
-                    if any(k in ro_text for k in ['訪問', '温罨法', '電療', '特別地域', '変形', '往療']):
-                        break
-                    parsed = parse_fee_row_smart(spot_ws, ro)
-                    if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
-                        l_row = parsed
-                        break
-                # 下段（50%逓減）の単価・回数・合計の正確な計算
-                if l_row['count'] is not None and l_row['count'] > 0:
-                    if l_row['price'] is None:
-                        if u_row['price'] is not None:
-                            l_row['price'] = int(round(u_row['price'] * 0.5))
-                        elif l_row['total'] is not None:
-                            l_row['price'] = l_row['total'] // l_row['count']
-                    if l_row['total'] is None and l_row['price'] is not None:
-                        l_row['total'] = l_row['price'] * l_row['count']
-
-                fees['tuusho'] = {
-                    'u_price': u_row['price'],
-                    'u_count': u_row['count'],
-                    'u_total': u_row['total'],
-                    'l_price': l_row['price'],
-                    'l_count': l_row['count'],
-                    'l_total': l_row['total'],
-                }
+                fees['tuusho'] = parse_multi_tier_section(r, ['訪問', '温罨法', '電療', '特別地域', '変形', '往療'])
             elif ('訪問施術料１' in v or '訪問施術料1' in v) and 'h1' not in fees:
-                u_row = parse_fee_row_smart(spot_ws, r)
-                l_row = {'price': None, 'count': None, 'total': None}
-                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 5)):
-                    ro_text = str(spot_ws.cell(row=ro, column=c).value or '')
-                    if any(k in ro_text for k in ['訪問施術料２', '訪問施術料2', '訪問施術料３', '訪問施術料3', '温罨法', '電療', '特別地域', '変形', '往療']):
-                        break
-                    parsed = parse_fee_row_smart(spot_ws, ro)
-                    if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
-                        l_row = parsed
-                        break
-                if l_row['count'] is not None and l_row['count'] > 0:
-                    if l_row['price'] is None:
-                        if u_row['price'] is not None:
-                            l_row['price'] = int(round(u_row['price'] * 0.5))
-                        elif l_row['total'] is not None:
-                            l_row['price'] = l_row['total'] // l_row['count']
-                    if l_row['total'] is None and l_row['price'] is not None:
-                        l_row['total'] = l_row['price'] * l_row['count']
-
-                fees['h1'] = {
-                    'u_price': u_row['price'],
-                    'u_count': u_row['count'],
-                    'u_total': u_row['total'],
-                    'l_price': l_row['price'],
-                    'l_count': l_row['count'],
-                    'l_total': l_row['total'],
-                }
+                fees['h1'] = parse_multi_tier_section(r, ['訪問施術料２', '訪問施術料2', '訪問施術料３', '訪問施術料3', '温罨法', '電療', '特別地域', '変形', '往療'])
             elif ('訪問施術料２' in v or '訪問施術料2' in v) and 'h2' not in fees:
-                u_row = parse_fee_row_smart(spot_ws, r)
-                l_row = {'price': None, 'count': None, 'total': None}
-                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 5)):
-                    ro_text = str(spot_ws.cell(row=ro, column=c).value or '')
-                    if any(k in ro_text for k in ['訪問施術料３', '訪問施術料3', '温罨法', '電療', '特別地域', '変形', '往療']):
-                        break
-                    parsed = parse_fee_row_smart(spot_ws, ro)
-                    if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
-                        l_row = parsed
-                        break
-                if l_row['count'] is not None and l_row['count'] > 0:
-                    if l_row['price'] is None:
-                        if u_row['price'] is not None:
-                            l_row['price'] = int(round(u_row['price'] * 0.5))
-                        elif l_row['total'] is not None:
-                            l_row['price'] = l_row['total'] // l_row['count']
-                    if l_row['total'] is None and l_row['price'] is not None:
-                        l_row['total'] = l_row['price'] * l_row['count']
-
-                fees['h2'] = {
-                    'u_price': u_row['price'],
-                    'u_count': u_row['count'],
-                    'u_total': u_row['total'],
-                    'l_price': l_row['price'],
-                    'l_count': l_row['count'],
-                    'l_total': l_row['total'],
-                }
+                fees['h2'] = parse_multi_tier_section(r, ['訪問施術料３', '訪問施術料3', '温罨法', '電療', '特別地域', '変形', '往療'])
             elif ('訪問施術料３' in v or '訪問施術料3' in v) and 'h3' not in fees:
-                u_row = parse_fee_row_smart(spot_ws, r)
-                l_row = {'price': None, 'count': None, 'total': None}
-                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 5)):
-                    ro_text = str(spot_ws.cell(row=ro, column=c).value or '')
-                    if any(k in ro_text for k in ['温罨法', '電療', '特別地域', '変形', '往療']):
-                        break
-                    parsed = parse_fee_row_smart(spot_ws, ro)
-                    if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
-                        l_row = parsed
-                        break
-                if l_row['count'] is not None and l_row['count'] > 0:
-                    if l_row['price'] is None:
-                        if u_row['price'] is not None:
-                            l_row['price'] = int(round(u_row['price'] * 0.5))
-                        elif l_row['total'] is not None:
-                            l_row['price'] = l_row['total'] // l_row['count']
-                    if l_row['total'] is None and l_row['price'] is not None:
-                        l_row['total'] = l_row['price'] * l_row['count']
-
-                fees['h3'] = {
-                    'u_price': u_row['price'],
-                    'u_count': u_row['count'],
-                    'u_total': u_row['total'],
-                    'l_price': l_row['price'],
-                    'l_count': l_row['count'],
-                    'l_total': l_row['total'],
-                }
+                fees['h3'] = parse_multi_tier_section(r, ['温罨法', '電療', '特別地域', '変形', '往療'])
             elif ('温罨法・電気光線' in v or '温罨法電気' in v) and 'on_den' not in fees:
                 fees['on_den'] = parse_fee_row_smart(spot_ws, r)
             elif '温罨法' in v and 'on_an' not in fees and '電気' not in v:
