@@ -1097,26 +1097,28 @@ def detect_acupuncture_diseases(ws, img_coords):
                 r_dis = r
                 break
         if r_dis: break
-    if not r_dis: r_dis = 58
+    if not r_dis: r_dis = 61
 
     is_other_selected = False
+    other_val = ''
+
+    # 1. 画像アンカー（丸印）による検知
     for (r, c) in img_coords:
         if r_dis - 2 <= r <= r_dis + 10:
-            if 14 <= c <= 22:
-                if r <= r_dis + 3: diseases['d1'] = '①. 神経痛'
+            if 14 <= c <= 25:
+                if r <= r_dis + 2: diseases['d1'] = '①. 神経痛'
                 else: diseases['d5'] = '⑤. 腰痛症'
-            elif 23 <= c <= 35:
-                if r <= r_dis + 3: diseases['d2'] = '②. リウマチ'
+            elif 26 <= c <= 37:
+                if r <= r_dis + 2: diseases['d2'] = '②. リウマチ'
                 else: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
-            elif 36 <= c <= 46:
-                if r <= r_dis + 3: diseases['d3'] = '③. 頸腕症候群'
-                else:
-                    diseases['d7'] = '⑦. その他（　　　　　　　　　）'
-                    is_other_selected = True
-            elif 47 <= c <= 58:
-                if r <= r_dis + 3: diseases['d4'] = '④. 五十肩'
+            elif 38 <= c <= 49:
+                if r <= r_dis + 2: diseases['d3'] = '③. 頸腕症候群'
+                else: is_other_selected = True
+            elif 50 <= c <= 62:
+                if r <= r_dis + 2: diseases['d4'] = '④. 五十肩'
 
-    for r in range(max(1, r_dis - 5), r_dis + 15):
+    # 2. テキストセル内の丸印・数字検知
+    for r in range(max(1, r_dis - 3), r_dis + 8):
         for c in range(10, ws.max_column + 1):
             v = str(ws.cell(row=r, column=c).value or '')
             if any(m in v for m in ['○', '●', '◎', '①', '②', '③', '④', '⑤', '⑥', '⑦']):
@@ -1126,25 +1128,40 @@ def detect_acupuncture_diseases(ws, img_coords):
                 if '五十肩' in v: diseases['d4'] = '④. 五十肩'
                 if '腰痛' in v: diseases['d5'] = '⑤. 腰痛症'
                 if '頸椎' in v: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
-                if 'その他' in v:
-                    is_other_selected = True
+                if 'その他' in v: is_other_selected = True
 
-    # 7. その他（「その他」が選択されている場合のみカッコ内テキストを抽出）
+    # 3. 7. その他 のカッコ内（列41〜60 / ANとBIの間）テキスト検知
+    for r in range(max(1, r_dis - 3), r_dis + 8):
+        for c in range(10, ws.max_column + 1):
+            v = str(ws.cell(row=r, column=c).value or '').strip()
+            if 'その他' in v:
+                m_other = re.search(r'その他\s*[（\(](.*?)[）\)]', v)
+                if m_other and m_other.group(1).strip():
+                    other_val = m_other.group(1).strip()
+                    is_other_selected = True
+                else:
+                    for co in range(c + 1, min(ws.max_column + 1, c + 21)):
+                        val_next = str(ws.cell(row=r, column=co).value or '').strip()
+                        if val_next in ['）', ')', '継続・治癒・中止・転医', '継続', '治癒', '中止', '転医']:
+                            break
+                        if val_next and val_next not in ['その他', '7. その他', '7.その他', '（', '7', '７']:
+                            other_val = val_next
+                            is_other_selected = True
+                            break
+
+    # 4. 上部の「傷病名・原因経過」欄（例: AM32）のテキストからの疾病名照合
+    for r in range(25, 40):
+        for c in range(25, min(ws.max_column + 1, 55)):
+            v = str(ws.cell(row=r, column=c).value or '')
+            if '神経痛' in v: diseases['d1'] = '①. 神経痛'
+            if 'リウマチ' in v: diseases['d2'] = '②. リウマチ'
+            if '頸腕' in v: diseases['d3'] = '③. 頸腕症候群'
+            if '五十肩' in v: diseases['d4'] = '④. 五十肩'
+            if '腰痛' in v: diseases['d5'] = '⑤. 腰痛症'
+            if '頸椎' in v: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
+
+    # 5. その他が選択されている場合の出力
     if is_other_selected:
-        other_val = ""
-        for r in range(max(1, r_dis - 5), r_dis + 15):
-            for c in range(10, ws.max_column + 1):
-                v = str(ws.cell(row=r, column=c).value or '').strip()
-                if 'その他' in v:
-                    m_other = re.search(r'その他\s*[（\(](.*?)[）\)]', v)
-                    if m_other and m_other.group(1).strip():
-                        other_val = m_other.group(1).strip()
-                    else:
-                        for co in range(c + 1, c + 8):
-                            val_next = str(ws.cell(row=r, column=co).value or '').strip()
-                            if val_next and val_next not in ['その他', '7. その他', '7.その他', '（', '）', '7']:
-                                other_val = val_next
-                                break
         if other_val:
             diseases['d7'] = f"⑦. その他（　{other_val}　）"
         else:
