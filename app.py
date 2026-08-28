@@ -595,7 +595,11 @@ def extract_header_box_digits(ws, label_keyword_or_row):
         for r in range(5, 35):
             for c in range(1, 15):
                 v = str(ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
-                if str(label_keyword_or_row) in v:
+                if label_keyword_or_row == '受給者番号':
+                    if '受給者番号' in v and '公費' not in v:
+                        target_row = r
+                        break
+                elif str(label_keyword_or_row) in v:
                     target_row = r
                     break
             if target_row: break
@@ -603,7 +607,8 @@ def extract_header_box_digits(ws, label_keyword_or_row):
     if not target_row: return []
     
     digits = []
-    for c in range(14, 42):
+    # 保険者番号（列AP以降）を拾わないよう列14〜38に限定
+    for c in range(14, 38):
         v = ws.cell(row=target_row, column=c).value
         if v is not None and str(v).strip().isdigit():
             digits.append(str(v).strip())
@@ -1094,6 +1099,7 @@ def detect_acupuncture_diseases(ws, img_coords):
         if r_dis: break
     if not r_dis: r_dis = 58
 
+    is_other_selected = False
     for (r, c) in img_coords:
         if r_dis - 2 <= r <= r_dis + 10:
             if 14 <= c <= 22:
@@ -1104,7 +1110,9 @@ def detect_acupuncture_diseases(ws, img_coords):
                 else: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
             elif 36 <= c <= 46:
                 if r <= r_dis + 3: diseases['d3'] = '③. 頸腕症候群'
-                else: diseases['d7'] = '⑦. その他（　　　　　　　　　）'
+                else:
+                    diseases['d7'] = '⑦. その他（　　　　　　　　　）'
+                    is_other_selected = True
             elif 47 <= c <= 58:
                 if r <= r_dis + 3: diseases['d4'] = '④. 五十肩'
 
@@ -1118,40 +1126,31 @@ def detect_acupuncture_diseases(ws, img_coords):
                 if '五十肩' in v: diseases['d4'] = '④. 五十肩'
                 if '腰痛' in v: diseases['d5'] = '⑤. 腰痛症'
                 if '頸椎' in v: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
-    # 7. その他（カッコ内の記載または別病名を動的抽出）
-    other_val = ""
-    for r in range(max(1, r_dis - 5), r_dis + 15):
-        for c in range(10, ws.max_column + 1):
-            v = str(ws.cell(row=r, column=c).value or '').strip()
-            if 'その他' in v:
-                m_other = re.search(r'その他\s*[（\(](.*?)[）\)]', v)
-                if m_other and m_other.group(1).strip():
-                    other_val = m_other.group(1).strip()
-                else:
-                    for co in range(c + 1, c + 8):
-                        val_next = str(ws.cell(row=r, column=co).value or '').strip()
-                        if val_next and val_next not in ['その他', '7. その他', '7.その他', '（', '）', '7']:
-                            other_val = val_next
-                            break
-                            
-    # 上部の傷病名欄テキストからも補助検知
-    for r in range(25, 45):
-        for c in range(15, min(ws.max_column + 1, 65)):
-            v = str(ws.cell(row=r, column=c).value or '')
-            if any(k in v for k in ['神経痛', '五十肩', '腰痛', 'リウマチ', '頸腕', '頸椎']):
-                if '神経痛' in v: diseases['d1'] = '①. 神経痛'
-                if 'リウマチ' in v: diseases['d2'] = '②. リウマチ'
-                if '頸腕' in v: diseases['d3'] = '③. 頸腕症候群'
-                if '五十肩' in v: diseases['d4'] = '④. 五十肩'
-                if '腰痛' in v: diseases['d5'] = '⑤. 腰痛症'
-                if '頸椎' in v: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
-            elif not other_val and v.strip() and not any(k in v for k in ['保険', '記号', '番号', '氏名', '住所']):
-                clean_v = re.sub(r'[\r\n]+', '', v).strip()
-                if len(clean_v) > 1 and any(k in clean_v for k in ['症', '炎', '痛', '麻痺', '拘縮', '障害', '病', '不全']):
-                    other_val = clean_v
+                if 'その他' in v:
+                    is_other_selected = True
 
-    if other_val:
-        diseases['d7'] = f"⑦. その他（　{other_val}　）"
+    # 7. その他（「その他」が選択されている場合のみカッコ内テキストを抽出）
+    if is_other_selected:
+        other_val = ""
+        for r in range(max(1, r_dis - 5), r_dis + 15):
+            for c in range(10, ws.max_column + 1):
+                v = str(ws.cell(row=r, column=c).value or '').strip()
+                if 'その他' in v:
+                    m_other = re.search(r'その他\s*[（\(](.*?)[）\)]', v)
+                    if m_other and m_other.group(1).strip():
+                        other_val = m_other.group(1).strip()
+                    else:
+                        for co in range(c + 1, c + 8):
+                            val_next = str(ws.cell(row=r, column=co).value or '').strip()
+                            if val_next and val_next not in ['その他', '7. その他', '7.その他', '（', '）', '7']:
+                                other_val = val_next
+                                break
+        if other_val:
+            diseases['d7'] = f"⑦. その他（　{other_val}　）"
+        else:
+            diseases['d7'] = "⑦. その他（　　　　　　　　　）"
+    else:
+        diseases['d7'] = "7. その他（　　　　　　　　　）"
         
     return diseases
 
@@ -1462,14 +1461,45 @@ def extract_middle_fees_dynamic(spot_ws):
             elif ('明細書' in v or '明細書発行' in v) and 'meisai' not in fees:
                 fees['meisai'] = parse_fee_row_smart(spot_ws, r)
             elif ('合計' in v or '合　計' in v) and 'goukei' not in fees:
-                parsed = parse_fee_row_smart(spot_ws, r)
-                fees['goukei'] = parsed['total']
+                val = None
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    cv = spot_ws.cell(r, co).value
+                    if cv is not None:
+                        s_cv = str(cv).strip()
+                        if s_cv and '割' not in s_cv and '円' not in s_cv and s_cv not in ['合計', '合　計']:
+                            try:
+                                val = int(float(s_cv.replace(',', '')))
+                                break
+                            except ValueError:
+                                pass
+                fees['goukei'] = val
             elif '一部負担金' in v and 'ichibu' not in fees:
-                parsed = parse_fee_row_smart(spot_ws, r)
-                fees['ichibu'] = parsed['total']
+                # 「1割」等の割合表記ではなく、実際の負担金額（例: 626）を取得
+                val = None
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    cv = spot_ws.cell(r, co).value
+                    if cv is not None:
+                        s_cv = str(cv).strip()
+                        if s_cv and '割' not in s_cv and '%' not in s_cv and '）' not in s_cv and '（' not in s_cv and s_cv != '円':
+                            try:
+                                val = int(float(s_cv.replace(',', '')))
+                                break
+                            except ValueError:
+                                pass
+                fees['ichibu'] = val
             elif ('請求額' in v or '請　求額' in v) and 'seikyuu' not in fees:
-                parsed = parse_fee_row_smart(spot_ws, r)
-                fees['seikyuu'] = parsed['total']
+                val = None
+                for co in range(c + 1, spot_ws.max_column + 1):
+                    cv = spot_ws.cell(r, co).value
+                    if cv is not None:
+                        s_cv = str(cv).strip()
+                        if s_cv and '割' not in s_cv and '円' not in s_cv and s_cv not in ['請求額', '請　求額']:
+                            try:
+                                val = int(float(s_cv.replace(',', '')))
+                                break
+                            except ValueError:
+                                pass
+                fees['seikyuu'] = val
 
     return fees
 
@@ -1857,12 +1887,16 @@ def extract_tokki_dynamic(spot_ws):
         for c in range(35, min(spot_ws.max_column + 1, 65)):
             v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
             if '特記事項' in v or '特記' in v:
-                for co in range(c + 1, c + 15):
-                    val = spot_ws.cell(r, co).value
-                    if val is not None:
-                        s_val = str(val).strip()
-                        if s_val and s_val not in ['特記事項', '特記', '1', '2', '1社国', '2公費']:
-                            return s_val
+                digits = []
+                for co in range(c + 1, min(spot_ws.max_column + 1, c + 10)):
+                    for ro in range(r, r + 4):
+                        val = spot_ws.cell(ro, co).value
+                        if val is not None:
+                            s_val = str(val).strip()
+                            if s_val and s_val.isdigit() and len(s_val) <= 2:
+                                digits.append(s_val)
+                if digits:
+                    return "".join(digits)
     return ''
 
 
@@ -2004,28 +2038,15 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     """はり・きゅう用の完全正確配置転記（全行の「円×」「回＝」「円」列位置を完全垂直一致）"""
     img_coords = get_image_anchors(spot_ws)
     
-    # 1. タイトル年月 & カレンダー月（完全動的抽出・施術月最優先同期）
-    p_days = extract_period_and_days_dynamic(spot_ws)
+    # 1. タイトル年月 & カレンダー月（spotlogの記載年月を忠実にそのまま反映）
     val_ym = extract_claim_year_month_dynamic(spot_ws)
-    
     month_num = ""
-    if p_days.get('from_date'):
-        m_match = re.search(r'(\d+)\s*月', str(p_days['from_date']))
-        if m_match:
-            month_num = m_match.group(1)
-    if not month_num and p_days.get('to_date'):
-        m_match = re.search(r'(\d+)\s*月', str(p_days['to_date']))
-        if m_match:
-            month_num = m_match.group(1)
-    if not month_num and val_ym:
+    if val_ym:
         m_match = re.search(r'(\d+)\s*月', str(val_ym))
         if m_match:
             month_num = m_match.group(1)
 
-    if month_num and val_ym:
-        str_ym = re.sub(r'\d+\s*月', f"{month_num}月", str(val_ym))
-        target_ws["E5"] = f"療 養 費 支 給 申 請 書{str_ym}（はり・きゅう用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{str_ym}）（はり・きゅう用）"
-    elif val_ym:
+    if val_ym:
         str_ym = str(val_ym)
         target_ws["E5"] = f"療 養 費 支 給 申 請 書{val_ym}（はり・きゅう用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{val_ym}）（はり・きゅう用）"
     elif month_num:
@@ -2401,28 +2422,15 @@ def convert_massage_dynamic(spot_ws, target_ws):
     """あんま・マッサージ用の完全正確配置転記（全行の「円×」「回＝」「円」列位置を完全垂直一致）"""
     img_coords = get_image_anchors(spot_ws)
     
-    # 1. タイトル年月 & カレンダー月（完全動的抽出・施術月最優先同期）
-    p_days = extract_period_and_days_dynamic(spot_ws)
+    # 1. タイトル年月 & カレンダー月（spotlogの記載年月を忠実にそのまま反映）
     val_ym = extract_claim_year_month_dynamic(spot_ws)
-    
     month_num = ""
-    if p_days.get('from_date'):
-        m_match = re.search(r'(\d+)\s*月', str(p_days['from_date']))
-        if m_match:
-            month_num = m_match.group(1)
-    if not month_num and p_days.get('to_date'):
-        m_match = re.search(r'(\d+)\s*月', str(p_days['to_date']))
-        if m_match:
-            month_num = m_match.group(1)
-    if not month_num and val_ym:
+    if val_ym:
         m_match = re.search(r'(\d+)\s*月', str(val_ym))
         if m_match:
             month_num = m_match.group(1)
 
-    if month_num and val_ym:
-        str_ym = re.sub(r'\d+\s*月', f"{month_num}月", str(val_ym))
-        target_ws["E5"] = f"療 養 費 支 給 申 請 書{str_ym}（あんま・マッサージ用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{str_ym}）（あんま・マッサージ用）"
-    elif val_ym:
+    if val_ym:
         str_ym = str(val_ym)
         target_ws["E5"] = f"療 養 費 支 給 申 請 書{val_ym}（あんま・マッサージ用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{val_ym}）（あんま・マッサージ用）"
     elif month_num:
