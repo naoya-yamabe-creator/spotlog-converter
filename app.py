@@ -1428,16 +1428,15 @@ def extract_middle_fees_dynamic(spot_ws):
                     if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
-                # 下段の単価・回数・合計の相互補完（式抜けを完全防止）
-                if (l_row['total'] or l_row['count']) and l_row['price'] is None:
-                    if l_row['total'] and l_row['count'] and l_row['count'] > 0:
-                        l_row['price'] = l_row['total'] // l_row['count']
-                    elif u_row['price']:
-                        l_row['price'] = u_row['price'] // 2
-                if l_row['total'] and l_row['price'] and l_row['count'] is None and l_row['price'] > 0:
-                    l_row['count'] = l_row['total'] // l_row['price']
-                if l_row['price'] and l_row['count'] and l_row['total'] is None:
-                    l_row['total'] = l_row['price'] * l_row['count']
+                # 下段（50%逓減）の単価・回数・合計の正確な計算
+                if l_row['count'] is not None and l_row['count'] > 0:
+                    if l_row['price'] is None:
+                        if u_row['price'] is not None:
+                            l_row['price'] = int(round(u_row['price'] * 0.5))
+                        elif l_row['total'] is not None:
+                            l_row['price'] = l_row['total'] // l_row['count']
+                    if l_row['total'] is None and l_row['price'] is not None:
+                        l_row['total'] = l_row['price'] * l_row['count']
 
                 fees['tuusho'] = {
                     'u_price': u_row['price'],
@@ -1458,15 +1457,14 @@ def extract_middle_fees_dynamic(spot_ws):
                     if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
-                if (l_row['total'] or l_row['count']) and l_row['price'] is None:
-                    if l_row['total'] and l_row['count'] and l_row['count'] > 0:
-                        l_row['price'] = l_row['total'] // l_row['count']
-                    elif u_row['price']:
-                        l_row['price'] = u_row['price'] // 2
-                if l_row['total'] and l_row['price'] and l_row['count'] is None and l_row['price'] > 0:
-                    l_row['count'] = l_row['total'] // l_row['price']
-                if l_row['price'] and l_row['count'] and l_row['total'] is None:
-                    l_row['total'] = l_row['price'] * l_row['count']
+                if l_row['count'] is not None and l_row['count'] > 0:
+                    if l_row['price'] is None:
+                        if u_row['price'] is not None:
+                            l_row['price'] = int(round(u_row['price'] * 0.5))
+                        elif l_row['total'] is not None:
+                            l_row['price'] = l_row['total'] // l_row['count']
+                    if l_row['total'] is None and l_row['price'] is not None:
+                        l_row['total'] = l_row['price'] * l_row['count']
 
                 fees['h1'] = {
                     'u_price': u_row['price'],
@@ -1487,15 +1485,14 @@ def extract_middle_fees_dynamic(spot_ws):
                     if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
-                if (l_row['total'] or l_row['count']) and l_row['price'] is None:
-                    if l_row['total'] and l_row['count'] and l_row['count'] > 0:
-                        l_row['price'] = l_row['total'] // l_row['count']
-                    elif u_row['price']:
-                        l_row['price'] = u_row['price'] // 2
-                if l_row['total'] and l_row['price'] and l_row['count'] is None and l_row['price'] > 0:
-                    l_row['count'] = l_row['total'] // l_row['price']
-                if l_row['price'] and l_row['count'] and l_row['total'] is None:
-                    l_row['total'] = l_row['price'] * l_row['count']
+                if l_row['count'] is not None and l_row['count'] > 0:
+                    if l_row['price'] is None:
+                        if u_row['price'] is not None:
+                            l_row['price'] = int(round(u_row['price'] * 0.5))
+                        elif l_row['total'] is not None:
+                            l_row['price'] = l_row['total'] // l_row['count']
+                    if l_row['total'] is None and l_row['price'] is not None:
+                        l_row['total'] = l_row['price'] * l_row['count']
 
                 fees['h2'] = {
                     'u_price': u_row['price'],
@@ -1516,15 +1513,14 @@ def extract_middle_fees_dynamic(spot_ws):
                     if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
-                if (l_row['total'] or l_row['count']) and l_row['price'] is None:
-                    if l_row['total'] and l_row['count'] and l_row['count'] > 0:
-                        l_row['price'] = l_row['total'] // l_row['count']
-                    elif u_row['price']:
-                        l_row['price'] = u_row['price'] // 2
-                if l_row['total'] and l_row['price'] and l_row['count'] is None and l_row['price'] > 0:
-                    l_row['count'] = l_row['total'] // l_row['price']
-                if l_row['price'] and l_row['count'] and l_row['total'] is None:
-                    l_row['total'] = l_row['price'] * l_row['count']
+                if l_row['count'] is not None and l_row['count'] > 0:
+                    if l_row['price'] is None:
+                        if u_row['price'] is not None:
+                            l_row['price'] = int(round(u_row['price'] * 0.5))
+                        elif l_row['total'] is not None:
+                            l_row['price'] = l_row['total'] // l_row['count']
+                    if l_row['total'] is None and l_row['price'] is not None:
+                        l_row['total'] = l_row['price'] * l_row['count']
 
                 fees['h3'] = {
                     'u_price': u_row['price'],
@@ -2183,12 +2179,12 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     # 受給者番号 (Row 28: 7〜8マス 動的抽出)
     fill_header_boxes(target_ws, 28, extract_header_box_digits(spot_ws, '受給者番号'))
 
-    # 特記事項コード (CO13: 2桁コード 動的抽出)
+    # 特記事項コード (CC17: 2桁コード 動的抽出 - 見出し直下の特記事項記入枠)
     tokki_code = extract_tokki_dynamic(spot_ws)
     if tokki_code:
-        target_ws["CO13"] = str(tokki_code)
-        target_ws["CO13"].alignment = Alignment(horizontal="center", vertical="center")
-        target_ws["CO13"].font = Font(name="ＭＳ 明朝", size=11, bold=True)
+        target_ws["CC17"] = str(tokki_code)
+        target_ws["CC17"].alignment = Alignment(horizontal="center", vertical="center")
+        target_ws["CC17"].font = Font(name="ＭＳ 明朝", size=14, bold=True)
 
     # 特記事項・保険種別・給付割合 (完全動的丸囲み)
     marks = detect_special_marks(spot_ws, img_coords)
@@ -2454,10 +2450,7 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     target_ws["EO211"] = "○本店" if "本店" in br_t else "本店"
     target_ws["EO214"] = "○支店" if "支店" in br_t else "支店"
     target_ws["EO217"] = "○出張所" if "出張所" in br_t else "出張所"
-    if pay_sec.get('is_post_office'):
-        target_ws["DU220"] = "○郵便局"
-    else:
-        target_ws["DU220"] = "郵便局"
+    target_ws["DU220"] = "郵便局"
     
     # 口座番号 & 口座名義（完全動的抽出: 右詰めで配置）
     acc_boxes = ["CG220", "CL220", "CQ220", "CV220", "DA220", "DF220", "DK220", "DP220"]
@@ -2567,12 +2560,12 @@ def convert_massage_dynamic(spot_ws, target_ws):
     # 受給者番号 (Row 28: 7〜8マス 動的抽出)
     fill_header_boxes(target_ws, 28, extract_header_box_digits(spot_ws, '受給者番号'))
 
-    # 特記事項コード (CO13: 2桁コード 動的抽出)
+    # 特記事項コード (CC17: 2桁コード 動的抽出 - 見出し直下の特記事項記入枠)
     tokki_code = extract_tokki_dynamic(spot_ws)
     if tokki_code:
-        target_ws["CO13"] = str(tokki_code)
-        target_ws["CO13"].alignment = Alignment(horizontal="center", vertical="center")
-        target_ws["CO13"].font = Font(name="ＭＳ 明朝", size=11, bold=True)
+        target_ws["CC17"] = str(tokki_code)
+        target_ws["CC17"].alignment = Alignment(horizontal="center", vertical="center")
+        target_ws["CC17"].font = Font(name="ＭＳ 明朝", size=14, bold=True)
 
     # 特記事項・保険種別・給付割合 (完全動的丸囲み)
     marks = detect_special_marks(spot_ws, img_coords)
@@ -2861,10 +2854,7 @@ def convert_massage_dynamic(spot_ws, target_ws):
     target_ws["EO215"] = "○本店" if "本店" in br_t else "本店"
     target_ws["EO218"] = "○支店" if "支店" in br_t else "支店"
     target_ws["EO221"] = "○出張所" if "出張所" in br_t else "出張所"
-    if pay_sec.get('is_post_office'):
-        target_ws["DU224"] = "○郵便局"
-    else:
-        target_ws["DU224"] = "郵便局"
+    target_ws["DU224"] = "郵便局"
     
     # 口座番号 & 口座名義（完全動的抽出: 右詰めで配置）
     acc_boxes = ["CG224", "CL224", "CQ224", "CV224", "DA224", "DF224", "DK224", "DP224"]
