@@ -1035,11 +1035,17 @@ def detect_payment_section(ws, img_coords):
     if not any([dep_1, dep_2, dep_3, dep_4]):
         dep_1 = True
 
+    is_post_office = any(k in bank_name or k in bank_type_raw or k in branch_name for k in ['郵便局', 'ゆうちょ'])
+    if is_post_office:
+        pay_3 = True
+        pay_1 = False
+
     return {
         'bank_name': bank_name,
-        'bank_type': bank_type_raw or '銀行',
+        'bank_type': bank_type_raw or ('郵便局' if is_post_office else '銀行'),
         'branch_name': branch_name,
-        'branch_type': branch_type_raw or '支店',
+        'branch_type': branch_type_raw or ('郵便局' if is_post_office else '支店'),
+        'is_post_office': is_post_office,
         'pay_1': pay_1,
         'pay_2': pay_2,
         'pay_3': pay_3,
@@ -1097,8 +1103,22 @@ def detect_acupuncture_diseases(ws, img_coords):
                 if '五十肩' in v: diseases['d4'] = '④. 五十肩'
                 if '腰痛' in v: diseases['d5'] = '⑤. 腰痛症'
                 if '頸椎' in v: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
-                if 'その他' in v: diseases['d7'] = '⑦. その他（　　　　　　　　　）'
-
+    # 7. その他（カッコ内の記載または別病名を動的抽出）
+    other_val = ""
+    for r in range(max(1, r_dis - 5), r_dis + 15):
+        for c in range(10, ws.max_column + 1):
+            v = str(ws.cell(row=r, column=c).value or '').strip()
+            if 'その他' in v:
+                m_other = re.search(r'その他\s*[（\(](.*?)[）\)]', v)
+                if m_other and m_other.group(1).strip():
+                    other_val = m_other.group(1).strip()
+                else:
+                    for co in range(c + 1, c + 8):
+                        val_next = str(ws.cell(row=r, column=co).value or '').strip()
+                        if val_next and val_next not in ['その他', '7. その他', '7.その他', '（', '）', '7']:
+                            other_val = val_next
+                            break
+                            
     # 上部の傷病名欄テキストからも補助検知
     for r in range(25, 45):
         for c in range(15, min(ws.max_column + 1, 65)):
@@ -1110,6 +1130,13 @@ def detect_acupuncture_diseases(ws, img_coords):
                 if '五十肩' in v: diseases['d4'] = '④. 五十肩'
                 if '腰痛' in v: diseases['d5'] = '⑤. 腰痛症'
                 if '頸椎' in v: diseases['d6'] = '⑥. 頸椎捻挫後遺症'
+            elif not other_val and v.strip() and not any(k in v for k in ['保険', '記号', '番号', '氏名', '住所']):
+                clean_v = re.sub(r'[\r\n]+', '', v).strip()
+                if len(clean_v) > 1 and any(k in clean_v for k in ['症', '炎', '痛', '麻痺', '拘縮', '障害', '病', '不全']):
+                    other_val = clean_v
+
+    if other_val:
+        diseases['d7'] = f"⑦. その他（　{other_val}　）"
         
     return diseases
 
@@ -1309,14 +1336,14 @@ def parse_fee_row_smart(spot_ws, r):
             col_yen_end = c
             
     if col_yen_x:
-        for c in range(col_yen_x - 1, 20, -1):
+        for c in range(col_yen_x - 1, 10, -1):
             val = clean_amount(spot_ws.cell(r, c).value)
             if val is not None:
                 price = val
                 break
                 
     if col_kai_eq:
-        start_c = col_yen_x if col_yen_x else 20
+        start_c = col_yen_x if col_yen_x else 10
         for c in range(col_kai_eq - 1, start_c, -1):
             val = clean_amount(spot_ws.cell(r, c).value)
             if val is not None:
@@ -1331,7 +1358,7 @@ def parse_fee_row_smart(spot_ws, r):
                 total = val
                 break
     else:
-        for c in range(25, spot_ws.max_column + 1):
+        for c in range(15, spot_ws.max_column + 1):
             val = clean_amount(spot_ws.cell(r, c).value)
             if val is not None:
                 total = val
@@ -1798,6 +1825,21 @@ def extract_claim_year_month_dynamic(spot_ws):
     return spot_ws["AH4"].value or spot_ws["E5"].value
 
 
+def extract_tokki_dynamic(spot_ws):
+    """特記事項（01, 02, 97, 98, 99等）を動的抽出"""
+    for r in range(10, 25):
+        for c in range(35, min(spot_ws.max_column + 1, 65)):
+            v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
+            if '特記事項' in v or '特記' in v:
+                for co in range(c + 1, c + 15):
+                    val = spot_ws.cell(r, co).value
+                    if val is not None:
+                        s_val = str(val).strip()
+                        if s_val and s_val not in ['特記事項', '特記', '1', '2', '1社国', '2公費']:
+                            return s_val
+    return ''
+
+
 def extract_treatment_location(ws):
     """「施術した場所」の記載内容をspotlogから抽出（通常時は請求区分見出しなどを拾わずNone）"""
     for r in range(44, 50):
@@ -1936,18 +1978,32 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     """はり・きゅう用の完全正確配置転記（全行の「円×」「回＝」「円」列位置を完全垂直一致）"""
     img_coords = get_image_anchors(spot_ws)
     
-    # 1. タイトル年月（動的抽出）
+    # 1. タイトル年月 & カレンダー月（完全動的抽出）
     val_ym = extract_claim_year_month_dynamic(spot_ws)
-    month_num = "7"
+    p_days = extract_period_and_days_dynamic(spot_ws)
+    
+    month_num = ""
     if val_ym:
-        str_ym = str(val_ym)
-        target_ws["E5"] = f"療 養 費 支 給 申 請 書{val_ym}（はり・きゅう用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{val_ym}）（はり・きゅう用）"
-        m_match = re.search(r'(\d+)\s*月', str_ym)
+        m_match = re.search(r'(\d+)\s*月', str(val_ym))
+        if m_match:
+            month_num = m_match.group(1)
+    if not month_num and p_days.get('from_date'):
+        m_match = re.search(r'(\d+)\s*月', str(p_days['from_date']))
+        if m_match:
+            month_num = m_match.group(1)
+    if not month_num and p_days.get('to_date'):
+        m_match = re.search(r'(\d+)\s*月', str(p_days['to_date']))
         if m_match:
             month_num = m_match.group(1)
 
-    # カレンダーの「月」枠（縦書き 7\n月）
-    target_ws["X164"] = f"{month_num}\n月"
+    if val_ym:
+        str_ym = str(val_ym)
+        target_ws["E5"] = f"療 養 費 支 給 申 請 書{val_ym}（はり・きゅう用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{val_ym}）（はり・きゅう用）"
+    elif month_num:
+        target_ws["E5"] = f"療 養 費 支 給 申 請 書（令和  年 {month_num}月分）（はり・きゅう用）"
+
+    # カレンダーの「月」枠（縦書き ○\n月）
+    target_ws["X164"] = f"{month_num}\n月" if month_num else "　\n月"
     target_ws["X164"].alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
     target_ws["X164"].font = Font(name="ＭＳ 明朝", size=10, bold=True)
 
@@ -1967,6 +2023,13 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     fill_header_boxes(target_ws, 23, extract_header_box_digits(spot_ws, '区市町村番号'))
     # 受給者番号 (Row 28: 7〜8マス 動的抽出)
     fill_header_boxes(target_ws, 28, extract_header_box_digits(spot_ws, '受給者番号'))
+
+    # 特記事項コード (CO13: 2桁コード 動的抽出)
+    tokki_code = extract_tokki_dynamic(spot_ws)
+    if tokki_code:
+        target_ws["CO13"] = str(tokki_code)
+        target_ws["CO13"].alignment = Alignment(horizontal="center", vertical="center")
+        target_ws["CO13"].font = Font(name="ＭＳ 明朝", size=11, bold=True)
 
     # 特記事項・保険種別・給付割合 (完全動的丸囲み)
     marks = detect_special_marks(spot_ws, img_coords)
@@ -2232,6 +2295,10 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     target_ws["EO211"] = "○本店" if "本店" in br_t else "本店"
     target_ws["EO214"] = "○支店" if "支店" in br_t else "支店"
     target_ws["EO217"] = "○出張所" if "出張所" in br_t else "出張所"
+    if pay_sec.get('is_post_office'):
+        target_ws["DU220"] = "○郵便局"
+    else:
+        target_ws["DU220"] = "郵便局"
     
     # 口座番号 & 口座名義（完全動的抽出: 右詰めで配置）
     acc_boxes = ["CG220", "CL220", "CQ220", "CV220", "DA220", "DF220", "DK220", "DP220"]
@@ -2305,18 +2372,32 @@ def convert_massage_dynamic(spot_ws, target_ws):
     """あんま・マッサージ用の完全正確配置転記（全行の「円×」「回＝」「円」列位置を完全垂直一致）"""
     img_coords = get_image_anchors(spot_ws)
     
-    # 1. タイトル年月（動的抽出）
+    # 1. タイトル年月 & カレンダー月（完全動的抽出）
     val_ym = extract_claim_year_month_dynamic(spot_ws)
-    month_num = "7"
+    p_days = extract_period_and_days_dynamic(spot_ws)
+    
+    month_num = ""
     if val_ym:
-        str_ym = str(val_ym)
-        target_ws["E5"] = f"療 養 費 支 給 申 請 書{val_ym}（あんま・マッサージ用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{val_ym}）（あんま・マッサージ用）"
-        m_match = re.search(r'(\d+)\s*月', str_ym)
+        m_match = re.search(r'(\d+)\s*月', str(val_ym))
+        if m_match:
+            month_num = m_match.group(1)
+    if not month_num and p_days.get('from_date'):
+        m_match = re.search(r'(\d+)\s*月', str(p_days['from_date']))
+        if m_match:
+            month_num = m_match.group(1)
+    if not month_num and p_days.get('to_date'):
+        m_match = re.search(r'(\d+)\s*月', str(p_days['to_date']))
         if m_match:
             month_num = m_match.group(1)
 
-    # カレンダーの「月」枠（縦書き 7\n月）
-    target_ws["X168"] = f"{month_num}\n月"
+    if val_ym:
+        str_ym = str(val_ym)
+        target_ws["E5"] = f"療 養 費 支 給 申 請 書{val_ym}（あんま・マッサージ用）" if "（" in str_ym else f"療 養 費 支 給 申 請 書（{val_ym}）（あんま・マッサージ用）"
+    elif month_num:
+        target_ws["E5"] = f"療 養 費 支 給 申 請 書（令和  年 {month_num}月分）（あんま・マッサージ用）"
+
+    # カレンダーの「月」枠（縦書き ○\n月）
+    target_ws["X168"] = f"{month_num}\n月" if month_num else "　\n月"
     target_ws["X168"].alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
     target_ws["X168"].font = Font(name="ＭＳ 明朝", size=10, bold=True)
 
@@ -2324,6 +2405,9 @@ def convert_massage_dynamic(spot_ws, target_ws):
     k_code = extract_kikan_code_dynamic(spot_ws)
     if k_code:
         target_ws["CC9"] = f"機関コード　{k_code}"
+
+    # 種類 (CY24: 04 マ)
+    target_ws["CY24"] = "04 マ"
 
     # 公費負担者番号 (Row 13: 8マス 動的抽出)
     fill_header_boxes(target_ws, 13, extract_header_box_digits(spot_ws, '公費負担者番号'))
@@ -2333,6 +2417,13 @@ def convert_massage_dynamic(spot_ws, target_ws):
     fill_header_boxes(target_ws, 23, extract_header_box_digits(spot_ws, '区市町村番号'))
     # 受給者番号 (Row 28: 7〜8マス 動的抽出)
     fill_header_boxes(target_ws, 28, extract_header_box_digits(spot_ws, '受給者番号'))
+
+    # 特記事項コード (CO13: 2桁コード 動的抽出)
+    tokki_code = extract_tokki_dynamic(spot_ws)
+    if tokki_code:
+        target_ws["CO13"] = str(tokki_code)
+        target_ws["CO13"].alignment = Alignment(horizontal="center", vertical="center")
+        target_ws["CO13"].font = Font(name="ＭＳ 明朝", size=11, bold=True)
 
     # 特記事項・保険種別・給付割合 (完全動的丸囲み)
     marks = detect_special_marks(spot_ws, img_coords)
@@ -2621,6 +2712,10 @@ def convert_massage_dynamic(spot_ws, target_ws):
     target_ws["EO215"] = "○本店" if "本店" in br_t else "本店"
     target_ws["EO218"] = "○支店" if "支店" in br_t else "支店"
     target_ws["EO221"] = "○出張所" if "出張所" in br_t else "出張所"
+    if pay_sec.get('is_post_office'):
+        target_ws["DU224"] = "○郵便局"
+    else:
+        target_ws["DU224"] = "郵便局"
     
     # 口座番号 & 口座名義（完全動的抽出: 右詰めで配置）
     acc_boxes = ["CG224", "CL224", "CQ224", "CV224", "DA224", "DF224", "DK224", "DP224"]
