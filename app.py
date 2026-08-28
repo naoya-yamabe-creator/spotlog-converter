@@ -1398,11 +1398,11 @@ def parse_fee_row_smart(spot_ws, r):
                 total = val
                 break
                 
-    # 単価・回数・合計の補完計算（片方が欠落している場合でも式と金額を完全成立）
-    if total is None and price is not None and count is not None:
-        total = price * count
-    elif price is None and total is not None and count is not None and count > 0:
+    # 単価・回数・合計の補完・整合性計算（式と金額を完全成立）
+    if total is not None and count is not None and count > 0 and (price is None or price * count != total):
         price = total // count
+    elif total is None and price is not None and count is not None:
+        total = price * count
     elif count is None and total is not None and price is not None and price > 0:
         count = total // price
         
@@ -1427,6 +1427,17 @@ def extract_middle_fees_dynamic(spot_ws):
                     if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
+                # 下段の単価・回数・合計の相互補完（式抜けを完全防止）
+                if (l_row['total'] or l_row['count']) and l_row['price'] is None:
+                    if l_row['total'] and l_row['count'] and l_row['count'] > 0:
+                        l_row['price'] = l_row['total'] // l_row['count']
+                    elif u_row['price']:
+                        l_row['price'] = u_row['price'] // 2
+                if l_row['total'] and l_row['price'] and l_row['count'] is None and l_row['price'] > 0:
+                    l_row['count'] = l_row['total'] // l_row['price']
+                if l_row['price'] and l_row['count'] and l_row['total'] is None:
+                    l_row['total'] = l_row['price'] * l_row['count']
+
                 fees['tuusho'] = {
                     'u_price': u_row['price'],
                     'u_count': u_row['count'],
@@ -1446,6 +1457,16 @@ def extract_middle_fees_dynamic(spot_ws):
                     if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
+                if (l_row['total'] or l_row['count']) and l_row['price'] is None:
+                    if l_row['total'] and l_row['count'] and l_row['count'] > 0:
+                        l_row['price'] = l_row['total'] // l_row['count']
+                    elif u_row['price']:
+                        l_row['price'] = u_row['price'] // 2
+                if l_row['total'] and l_row['price'] and l_row['count'] is None and l_row['price'] > 0:
+                    l_row['count'] = l_row['total'] // l_row['price']
+                if l_row['price'] and l_row['count'] and l_row['total'] is None:
+                    l_row['total'] = l_row['price'] * l_row['count']
+
                 fees['h1'] = {
                     'u_price': u_row['price'],
                     'u_count': u_row['count'],
@@ -1465,6 +1486,16 @@ def extract_middle_fees_dynamic(spot_ws):
                     if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
+                if (l_row['total'] or l_row['count']) and l_row['price'] is None:
+                    if l_row['total'] and l_row['count'] and l_row['count'] > 0:
+                        l_row['price'] = l_row['total'] // l_row['count']
+                    elif u_row['price']:
+                        l_row['price'] = u_row['price'] // 2
+                if l_row['total'] and l_row['price'] and l_row['count'] is None and l_row['price'] > 0:
+                    l_row['count'] = l_row['total'] // l_row['price']
+                if l_row['price'] and l_row['count'] and l_row['total'] is None:
+                    l_row['total'] = l_row['price'] * l_row['count']
+
                 fees['h2'] = {
                     'u_price': u_row['price'],
                     'u_count': u_row['count'],
@@ -1484,6 +1515,16 @@ def extract_middle_fees_dynamic(spot_ws):
                     if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
+                if (l_row['total'] or l_row['count']) and l_row['price'] is None:
+                    if l_row['total'] and l_row['count'] and l_row['count'] > 0:
+                        l_row['price'] = l_row['total'] // l_row['count']
+                    elif u_row['price']:
+                        l_row['price'] = u_row['price'] // 2
+                if l_row['total'] and l_row['price'] and l_row['count'] is None and l_row['price'] > 0:
+                    l_row['count'] = l_row['total'] // l_row['price']
+                if l_row['price'] and l_row['count'] and l_row['total'] is None:
+                    l_row['total'] = l_row['price'] * l_row['count']
+
                 fees['h3'] = {
                     'u_price': u_row['price'],
                     'u_count': u_row['count'],
@@ -1942,21 +1983,28 @@ def extract_claim_year_month_dynamic(spot_ws):
 
 
 def extract_tokki_dynamic(spot_ws):
-    """特記事項（01, 02, 97, 98, 99等）を動的抽出"""
+    """特記事項（01, 02, 14, 97, 98, 99等）を動的抽出"""
+    # 1. 「特記事項」ラベルの周辺セル（右隣および直下）を探索
     for r in range(10, 25):
         for c in range(35, min(spot_ws.max_column + 1, 65)):
             v = str(spot_ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
             if '特記事項' in v or '特記' in v:
-                digits = []
-                for co in range(c + 1, min(spot_ws.max_column + 1, c + 10)):
-                    for ro in range(r, r + 4):
+                for ro in range(r, min(spot_ws.max_row + 1, r + 7)):
+                    for co in range(c, min(spot_ws.max_column + 1, c + 15)):
                         val = spot_ws.cell(ro, co).value
                         if val is not None:
                             s_val = str(val).strip()
-                            if s_val and s_val.isdigit() and len(s_val) <= 2:
-                                digits.append(s_val)
-                if digits:
-                    return "".join(digits)
+                            if s_val.isdigit() and 1 <= len(s_val) <= 2:
+                                return s_val
+                                
+    # 2. 全体フォールバック: 列40〜55、行11〜18の間の2桁数値を探索
+    for r in range(11, 19):
+        for c in range(40, min(spot_ws.max_column + 1, 55)):
+            v = spot_ws.cell(r, c).value
+            if v is not None:
+                s_val = str(v).strip()
+                if s_val.isdigit() and len(s_val) == 2 and s_val not in ['05', '04', '10', '20', '30']:
+                    return s_val
     return ''
 
 
