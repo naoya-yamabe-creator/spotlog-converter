@@ -531,13 +531,13 @@ def safe_apply_grid_row(ws, start_r, end_r, price_val='', count_val='', total_va
         ws.cell(row=start_r, column=c_c_start, value=c1_str).alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
         ws.cell(row=start_r, column=c_t_start, value=t1_str).alignment = openpyxl.styles.Alignment(horizontal='right', vertical='center')
 
-    # 記号枠（円×, 回＝, 円）
+    # 記号枠（円×, 回＝, 円 は値の有無に関わらず常に表示）
     ws.merge_cells(start_row=start_r, start_column=c_m1_start, end_row=end_r, end_column=c_m1_end)
     ws.merge_cells(start_row=start_r, start_column=c_m2_start, end_row=end_r, end_column=c_m2_end)
     ws.merge_cells(start_row=start_r, start_column=c_m3_start, end_row=end_r, end_column=c_m3_end)
-    ws.cell(row=start_r, column=c_m1_start, value='円×' if p1_str else '').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
-    ws.cell(row=start_r, column=c_m2_start, value='回＝' if c1_str else '').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
-    ws.cell(row=start_r, column=c_m3_start, value='円' if t1_str else '').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+    ws.cell(row=start_r, column=c_m1_start, value='円×').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+    ws.cell(row=start_r, column=c_m2_start, value='回＝').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+    ws.cell(row=start_r, column=c_m3_start, value='円').alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
     
     # 清掃: c_m3_start 以降のセル内容をクリアして円記号重複を完全防止
     for c_i in range(c_m3_start + 1, c_m3_end + 1):
@@ -573,11 +573,25 @@ def get_image_anchors(ws):
     return image_coords
 
 
-def extract_header_box_digits(ws, row_idx):
-    """spotlogの指定行（12:公費負担者, 16:公費受給者, 20:区市町村, 24:受給者）から数字列を抽出"""
+def extract_header_box_digits(ws, label_keyword_or_row):
+    """spotlogの見出し（公費負担者番号、公費受給者番号、区市町村番号、受給者番号）から数字列を動的抽出"""
+    if isinstance(label_keyword_or_row, int):
+        target_row = label_keyword_or_row
+    else:
+        target_row = None
+        for r in range(5, 35):
+            for c in range(1, 15):
+                v = str(ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
+                if str(label_keyword_or_row) in v:
+                    target_row = r
+                    break
+            if target_row: break
+            
+    if not target_row: return []
+    
     digits = []
-    for c in range(14, 40):
-        v = ws.cell(row=row_idx, column=c).value
+    for c in range(14, 42):
+        v = ws.cell(row=target_row, column=c).value
         if v is not None and str(v).strip().isdigit():
             digits.append(str(v).strip())
     return digits
@@ -1945,14 +1959,14 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     # 種類 (CY24: 05 鍼灸)
     target_ws["CY24"] = "05 鍼灸"
 
-    # 公費負担者番号 (Row 13: 8マス)
-    fill_header_boxes(target_ws, 13, extract_header_box_digits(spot_ws, 12))
-    # 公費受給者番号 (Row 18: 7〜8マス)
-    fill_header_boxes(target_ws, 18, extract_header_box_digits(spot_ws, 16))
-    # 区市町村番号 (Row 23: 6〜8マス)
-    fill_header_boxes(target_ws, 23, extract_header_box_digits(spot_ws, 20))
-    # 受給者番号 (Row 28: 7〜8マス)
-    fill_header_boxes(target_ws, 28, extract_header_box_digits(spot_ws, 24))
+    # 公費負担者番号 (Row 13: 8マス 動的抽出)
+    fill_header_boxes(target_ws, 13, extract_header_box_digits(spot_ws, '公費負担者番号'))
+    # 公費受給者番号 (Row 18: 7〜8マス 動的抽出)
+    fill_header_boxes(target_ws, 18, extract_header_box_digits(spot_ws, '公費受給者番号'))
+    # 区市町村番号 (Row 23: 6〜8マス 動的抽出)
+    fill_header_boxes(target_ws, 23, extract_header_box_digits(spot_ws, '区市町村番号'))
+    # 受給者番号 (Row 28: 7〜8マス 動的抽出)
+    fill_header_boxes(target_ws, 28, extract_header_box_digits(spot_ws, '受給者番号'))
 
     # 特記事項・保険種別・給付割合 (完全動的丸囲み)
     marks = detect_special_marks(spot_ws, img_coords)
@@ -2053,6 +2067,9 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     target_ws["J82"] = fe_res['text']
     if fe_res['price']:
         target_ws["BF82"] = f"{fe_res['price']} 円"
+    else:
+        target_ws["BF82"] = "円"
+    target_ws["BF82"].alignment = Alignment(horizontal="right", vertical="center")
 
     # 施術の種類 (1術・2術 回数 & 摘要欄 動的抽出)
     ac_jutsu = extract_acupuncture_jutsu_counts_dynamic(spot_ws)
@@ -2063,52 +2080,43 @@ def convert_acupuncture_dynamic(spot_ws, target_ws):
     m_fees = extract_middle_fees_dynamic(spot_ws)
 
     # 通所 (Row 92..99)
-    if 'tuusho' in m_fees:
-        tf = m_fees['tuusho']
-        safe_apply_grid_row(target_ws, 92, 99, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=True)
+    tf = m_fees.get('tuusho', {})
+    safe_apply_grid_row(target_ws, 92, 99, tf.get('u_price'), tf.get('u_count'), tf.get('u_total'), tf.get('l_price'), tf.get('l_count'), tf.get('l_total'), is_boxed=True)
 
     # 訪問施術料１ (Row 100..107)
-    if 'h1' in m_fees:
-        tf = m_fees['h1']
-        safe_apply_grid_row(target_ws, 100, 107, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
+    tf = m_fees.get('h1', {})
+    safe_apply_grid_row(target_ws, 100, 107, tf.get('u_price'), tf.get('u_count'), tf.get('u_total'), tf.get('l_price'), tf.get('l_count'), tf.get('l_total'), is_boxed=False)
 
     # 訪問施術料２ (Row 108..115)
-    if 'h2' in m_fees:
-        tf = m_fees['h2']
-        safe_apply_grid_row(target_ws, 108, 115, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
+    tf = m_fees.get('h2', {})
+    safe_apply_grid_row(target_ws, 108, 115, tf.get('u_price'), tf.get('u_count'), tf.get('u_total'), tf.get('l_price'), tf.get('l_count'), tf.get('l_total'), is_boxed=False)
 
     # 訪問施術料３ (Row 116..123)
-    if 'h3' in m_fees:
-        tf = m_fees['h3']
-        safe_apply_grid_row(target_ws, 116, 123, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
+    tf = m_fees.get('h3', {})
+    safe_apply_grid_row(target_ws, 116, 123, tf.get('u_price'), tf.get('u_count'), tf.get('u_total'), tf.get('l_price'), tf.get('l_count'), tf.get('l_total'), is_boxed=False)
 
     # 電療料 (Row 124..128)
     target_ws["O124"] = detect_electrotherapy(spot_ws, img_coords)
-    if 'denryou' in m_fees:
-        tf = m_fees['denryou']
-        safe_apply_grid_row(target_ws, 124, 128, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('denryou', {})
+    safe_apply_grid_row(target_ws, 124, 128, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 特別地域 (Row 129..133)
-    if 'tokubetsu' in m_fees:
-        tf = m_fees['tokubetsu']
-        safe_apply_grid_row(target_ws, 129, 133, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('tokubetsu', {})
+    safe_apply_grid_row(target_ws, 129, 133, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 往療料 (Row 134..138)
-    if 'ouryou' in m_fees:
-        tf = m_fees['ouryou']
-        safe_apply_grid_row(target_ws, 134, 138, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('ouryou', {})
+    safe_apply_grid_row(target_ws, 134, 138, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 施術報告書交付料 (Row 139..143)
     prev_ym_hari = extract_report_prev_date(spot_ws, is_massage=False)
     target_ws["J139"] = f"施術報告書交付料（前回支給：{prev_ym_hari}）"
-    if 'houkoku' in m_fees:
-        tf = m_fees['houkoku']
-        safe_apply_grid_row(target_ws, 139, 143, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('houkoku', {})
+    safe_apply_grid_row(target_ws, 139, 143, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 明細書発行加算 (Row 144..148)
-    if 'meisai' in m_fees and m_fees['meisai']:
-        tf = m_fees['meisai']
-        safe_apply_grid_row(target_ws, 144, 148, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('meisai', {})
+    safe_apply_grid_row(target_ws, 144, 148, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 合計
     if 'goukei' in m_fees and m_fees['goukei'] is not None:
@@ -2317,14 +2325,14 @@ def convert_massage_dynamic(spot_ws, target_ws):
     if k_code:
         target_ws["CC9"] = f"機関コード　{k_code}"
 
-    # 公費負担者番号 (Row 13: 8マス)
-    fill_header_boxes(target_ws, 13, extract_header_box_digits(spot_ws, 12))
-    # 公費受給者番号 (Row 18: 7〜8マス)
-    fill_header_boxes(target_ws, 18, extract_header_box_digits(spot_ws, 16))
-    # 区市町村番号 (Row 23: 6〜8マス)
-    fill_header_boxes(target_ws, 23, extract_header_box_digits(spot_ws, 20))
-    # 受給者番号 (Row 28: 7〜8マス)
-    fill_header_boxes(target_ws, 28, extract_header_box_digits(spot_ws, 24))
+    # 公費負担者番号 (Row 13: 8マス 動的抽出)
+    fill_header_boxes(target_ws, 13, extract_header_box_digits(spot_ws, '公費負担者番号'))
+    # 公費受給者番号 (Row 18: 7〜8マス 動的抽出)
+    fill_header_boxes(target_ws, 18, extract_header_box_digits(spot_ws, '公費受給者番号'))
+    # 区市町村番号 (Row 23: 6〜8マス 動的抽出)
+    fill_header_boxes(target_ws, 23, extract_header_box_digits(spot_ws, '区市町村番号'))
+    # 受給者番号 (Row 28: 7〜8マス 動的抽出)
+    fill_header_boxes(target_ws, 28, extract_header_box_digits(spot_ws, '受給者番号'))
 
     # 特記事項・保険種別・給付割合 (完全動的丸囲み)
     marks = detect_special_marks(spot_ws, img_coords)
@@ -2446,34 +2454,28 @@ def convert_massage_dynamic(spot_ws, target_ws):
     m_fees = extract_middle_fees_dynamic(spot_ws)
 
     # 通所 (Row 88..95)
-    if 'tuusho' in m_fees:
-        tf = m_fees['tuusho']
-        safe_apply_grid_row(target_ws, 88, 95, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
+    tf = m_fees.get('tuusho', {})
+    safe_apply_grid_row(target_ws, 88, 95, tf.get('u_price'), tf.get('u_count'), tf.get('u_total'), tf.get('l_price'), tf.get('l_count'), tf.get('l_total'), is_boxed=False)
 
     # 訪問施術料１ (Row 96..103)
-    if 'h1' in m_fees:
-        tf = m_fees['h1']
-        safe_apply_grid_row(target_ws, 96, 103, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
+    tf = m_fees.get('h1', {})
+    safe_apply_grid_row(target_ws, 96, 103, tf.get('u_price'), tf.get('u_count'), tf.get('u_total'), tf.get('l_price'), tf.get('l_count'), tf.get('l_total'), is_boxed=False)
 
     # 訪問施術料２ (Row 104..111)
-    if 'h2' in m_fees:
-        tf = m_fees['h2']
-        safe_apply_grid_row(target_ws, 104, 111, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
+    tf = m_fees.get('h2', {})
+    safe_apply_grid_row(target_ws, 104, 111, tf.get('u_price'), tf.get('u_count'), tf.get('u_total'), tf.get('l_price'), tf.get('l_count'), tf.get('l_total'), is_boxed=False)
 
     # 訪問施術料３ (Row 112..119)
-    if 'h3' in m_fees:
-        tf = m_fees['h3']
-        safe_apply_grid_row(target_ws, 112, 119, tf['u_price'], tf['u_count'], tf['u_total'], tf['l_price'], tf['l_count'], tf['l_total'], is_boxed=False)
+    tf = m_fees.get('h3', {})
+    safe_apply_grid_row(target_ws, 112, 119, tf.get('u_price'), tf.get('u_count'), tf.get('u_total'), tf.get('l_price'), tf.get('l_count'), tf.get('l_total'), is_boxed=False)
 
     # 温罨法 (加算 Row 120..123)
-    if 'on_an' in m_fees:
-        tf = m_fees['on_an']
-        safe_apply_grid_row(target_ws, 120, 123, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('on_an', {})
+    safe_apply_grid_row(target_ws, 120, 123, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 温罨法・電気光線器具 (加算 Row 124..127)
-    if 'on_den' in m_fees:
-        tf = m_fees['on_den']
-        safe_apply_grid_row(target_ws, 124, 127, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('on_den', {})
+    safe_apply_grid_row(target_ws, 124, 127, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 変形徒手矯正術 (Row 132 & Row 136..139 動的抽出)
     target_ws["BS132"] = mb_counts.get('henkei_r_arm', '')
@@ -2484,33 +2486,26 @@ def convert_massage_dynamic(spot_ws, target_ws):
     target_ws["CQ132"].alignment = Alignment(horizontal="center", vertical="center")
     target_ws["DC132"] = mb_counts.get('henkei_l_leg', '')
     target_ws["DC132"].alignment = Alignment(horizontal="center", vertical="center")
-    if 'henkei' in m_fees and m_fees['henkei']:
-        tf = m_fees['henkei']
-        safe_apply_grid_row(target_ws, 136, 139, tf['price'], tf['count'], tf['total'], is_boxed=False)
-    else:
-        safe_apply_grid_row(target_ws, 136, 139, None, None, None, is_boxed=False)
+    tf = m_fees.get('henkei', {})
+    safe_apply_grid_row(target_ws, 136, 139, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 特別地域 (加算 Row 140..143)
-    if 'tokubetsu' in m_fees:
-        tf = m_fees['tokubetsu']
-        safe_apply_grid_row(target_ws, 140, 143, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('tokubetsu', {})
+    safe_apply_grid_row(target_ws, 140, 143, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 往療料 (Row 144..147)
-    if 'ouryou' in m_fees:
-        tf = m_fees['ouryou']
-        safe_apply_grid_row(target_ws, 144, 147, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('ouryou', {})
+    safe_apply_grid_row(target_ws, 144, 147, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 施術報告書交付料 (Row 148..151)
     prev_ym_mass = extract_report_prev_date(spot_ws, is_massage=True)
     target_ws["J148"] = f"施術報告書交付料　（前回支給：{prev_ym_mass}）"
-    if 'houkoku' in m_fees:
-        tf = m_fees['houkoku']
-        safe_apply_grid_row(target_ws, 148, 151, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('houkoku', {})
+    safe_apply_grid_row(target_ws, 148, 151, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
         
     # 明細書発行加算 (Row 152..155)
-    if 'meisai' in m_fees and m_fees['meisai']:
-        tf = m_fees['meisai']
-        safe_apply_grid_row(target_ws, 152, 155, tf['price'], tf['count'], tf['total'], is_boxed=False)
+    tf = m_fees.get('meisai', {})
+    safe_apply_grid_row(target_ws, 152, 155, tf.get('price'), tf.get('count'), tf.get('total'), is_boxed=False)
 
     # 合計
     if 'goukei' in m_fees and m_fees['goukei'] is not None:
