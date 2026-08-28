@@ -1421,42 +1421,29 @@ def extract_middle_fees_dynamic(spot_ws):
                 if any(k in label_check for k in stop_keywords):
                     break
                     
-            row_cells = [(c, spot_ws.cell(r, c).value) for c in range(1, spot_ws.max_column + 1) if spot_ws.cell(r, c).value is not None]
-            col_yen_x = None
-            col_kai_eq = None
-            col_yen_end = None
-            
-            for c, v in row_cells:
-                s = str(v).replace(' ', '').replace('　', '')
-                if '円×' in s or '円*' in s:
-                    col_yen_x = c
-                elif '回＝' in s or '回=' in s:
-                    col_kai_eq = c
-                elif s == '円' and col_kai_eq and c > col_kai_eq:
-                    col_yen_end = c
-                    
             prices, counts, totals = [], [], []
-            if col_yen_x:
-                for c in range(col_yen_x - 1, 14, -1):
-                    vals = clean_amount_list(spot_ws.cell(r, c).value)
-                    if vals:
-                        prices = vals
-                        break
-            if col_kai_eq:
-                start_c = col_yen_x if col_yen_x else 14
-                for c in range(col_kai_eq - 1, start_c, -1):
-                    vals = clean_amount_list(spot_ws.cell(r, c).value)
-                    if vals:
-                        counts = vals
-                        break
-            if col_kai_eq:
-                end_c = col_yen_end if col_yen_end else spot_ws.max_column + 1
-                for c in range(col_kai_eq + 1, end_c):
-                    vals = clean_amount_list(spot_ws.cell(r, c).value)
-                    if vals:
-                        totals = vals
-                        break
-                        
+            
+            # 単価帯（列25〜39）
+            for c in range(25, 40):
+                vals = clean_amount_list(spot_ws.cell(r, c).value)
+                if vals:
+                    prices = vals
+                    break
+                    
+            # 回数帯（列40〜49）
+            for c in range(40, 50):
+                vals = clean_amount_list(spot_ws.cell(r, c).value)
+                if vals:
+                    counts = vals
+                    break
+                    
+            # 金額帯（列50〜65）
+            for c in range(50, 65):
+                vals = clean_amount_list(spot_ws.cell(r, c).value)
+                if vals:
+                    totals = vals
+                    break
+                    
             n_lines = max(len(prices), len(counts), len(totals))
             if n_lines > 0:
                 for idx in range(n_lines):
