@@ -441,31 +441,64 @@ def format_currency_str(val):
         return str(val)
 
 
+def extract_header_box_digits(ws, label_keyword_or_row):
+    """spotlogの見出し（公費負担者番号、公費受給者番号、区市町村番号、受給者番号）から数字列を動的抽出"""
+    if isinstance(label_keyword_or_row, int):
+        target_row = label_keyword_or_row
+    else:
+        target_row = None
+        for r in range(5, 35):
+            for c in range(1, 15):
+                v = str(ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
+                if label_keyword_or_row == '受給者番号':
+                    if '受給者番号' in v and '公費' not in v:
+                        target_row = r
+                        break
+                elif str(label_keyword_or_row) in v:
+                    target_row = r
+                    break
+            if target_row: break
+            
+    if not target_row: return []
+    
+    digits = []
+    # 8マス全マス（第8マス=列38(AL)を含む列14〜39）を完全走査
+    for c in range(14, 40):
+        v = ws.cell(row=target_row, column=c).value
+        if v is not None and str(v).strip().isdigit():
+            digits.append(str(v).strip())
+    return digits
+
+
+def fill_header_boxes(target_ws, target_row, digits):
+    """基準様式の8マスヘッダー欄へ右詰めで数値を入力"""
+    box_cols = ['AF', 'AL', 'AR', 'AX', 'BD', 'BJ', 'BP', 'BV']
+    for col in box_cols:
+        target_ws[f"{col}{target_row}"] = None
+    if digits:
+        digs = digits[-len(box_cols):] if len(digits) > len(box_cols) else digits
+        start_idx = len(box_cols) - len(digs)
+        for i, d in enumerate(digs):
+            cell = target_ws[f"{box_cols[start_idx + i]}{target_row}"]
+            cell.value = str(d)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+
 def safe_apply_grid_row(ws, start_r, end_r, price_val='', count_val='', total_val='', price_val2=None, count_val2=None, total_val2=None, is_boxed=False):
     """
     金額計算行を正確な列セル[単価][円×][回数][回＝][金額][円]で配置
-    - is_boxed=True: 通所用（標準格子枠・外枠罫線あり）
-    - is_boxed=False: 通所以外（見本通り「円×」「回＝」を右寄りにシフト配置・罫線なし）
+    - 2段データがある場合のみ2列（2段）構成に分割
+    - 1段のみの場合は全高さを結合して1列（1段）構成で綺麗に配置
     """
     col_bf = openpyxl.utils.column_index_from_string('BF')
     col_dn = openpyxl.utils.column_index_from_string('DN')
 
-    if is_boxed:
-        # 通所用 (標準配置・枠線あり)
-        c_p_start, c_p_end = openpyxl.utils.column_index_from_string('BF'), openpyxl.utils.column_index_from_string('BV')
-        c_m1_start, c_m1_end = openpyxl.utils.column_index_from_string('BW'), openpyxl.utils.column_index_from_string('CC')
-        c_c_start, c_c_end = openpyxl.utils.column_index_from_string('CD'), openpyxl.utils.column_index_from_string('CP')
-        c_m2_start, c_m2_end = openpyxl.utils.column_index_from_string('CQ'), openpyxl.utils.column_index_from_string('CW')
-        c_t_start, c_t_end = openpyxl.utils.column_index_from_string('CX'), openpyxl.utils.column_index_from_string('DJ')
-        c_m3_start, c_m3_end = openpyxl.utils.column_index_from_string('DK'), openpyxl.utils.column_index_from_string('DN')
-    else:
-        # 通所以外（見本通り「円×」「回＝」を右寄りに配置し、金額欄CZ:DJを6桁が自然に収まる適正幅に調整）
-        c_p_start, c_p_end = openpyxl.utils.column_index_from_string('BF'), openpyxl.utils.column_index_from_string('CD')
-        c_m1_start, c_m1_end = openpyxl.utils.column_index_from_string('CE'), openpyxl.utils.column_index_from_string('CK')
-        c_c_start, c_c_end = openpyxl.utils.column_index_from_string('CL'), openpyxl.utils.column_index_from_string('CQ')
-        c_m2_start, c_m2_end = openpyxl.utils.column_index_from_string('CR'), openpyxl.utils.column_index_from_string('CY')
-        c_t_start, c_t_end = openpyxl.utils.column_index_from_string('CZ'), openpyxl.utils.column_index_from_string('DJ')
-        c_m3_start, c_m3_end = openpyxl.utils.column_index_from_string('DK'), openpyxl.utils.column_index_from_string('DN')
+    c_p_start, c_p_end = openpyxl.utils.column_index_from_string('BF'), openpyxl.utils.column_index_from_string('CD')
+    c_m1_start, c_m1_end = openpyxl.utils.column_index_from_string('CE'), openpyxl.utils.column_index_from_string('CK')
+    c_c_start, c_c_end = openpyxl.utils.column_index_from_string('CL'), openpyxl.utils.column_index_from_string('CQ')
+    c_m2_start, c_m2_end = openpyxl.utils.column_index_from_string('CR'), openpyxl.utils.column_index_from_string('CY')
+    c_t_start, c_t_end = openpyxl.utils.column_index_from_string('CZ'), openpyxl.utils.column_index_from_string('DJ')
+    c_m3_start, c_m3_end = openpyxl.utils.column_index_from_string('DK'), openpyxl.utils.column_index_from_string('DN')
 
     # 1. 範囲内と交差する既存の結合をすべて安全に解除
     to_unmerge = []
@@ -480,7 +513,7 @@ def safe_apply_grid_row(ws, start_r, end_r, price_val='', count_val='', total_va
         except Exception:
             pass
 
-    # 2. セル内容と罫線をリセット（外枠・行境界のみ保持、内部の縦線は完全にゼロ）
+    # 2. セル内容と罫線をリセット
     thin = openpyxl.styles.Side(style='thin', color='000000')
     font_ms = openpyxl.styles.Font(name='ＭＳ 明朝', size=9.5)
 
@@ -495,7 +528,8 @@ def safe_apply_grid_row(ws, start_r, end_r, price_val='', count_val='', total_va
             cell.border = openpyxl.styles.Border(top=t_s, bottom=b_s, left=l_s, right=r_s)
             cell.font = font_ms
 
-    has_two = (end_r - start_r + 1) >= 6
+    # 2列（2段）データが存在するか判定
+    has_two = any([price_val2, count_val2, total_val2]) and any(str(x).strip() not in ['', '0', '0円', 'None'] for x in [price_val2, count_val2, total_val2] if x is not None)
     
     p1_str = format_currency_str(price_val) if price_val else ''
     c1_str = str(count_val) if (count_val is not None and str(count_val).strip() != '') else ''
@@ -506,6 +540,16 @@ def safe_apply_grid_row(ws, start_r, end_r, price_val='', count_val='', total_va
         p2_str = format_currency_str(price_val2) if price_val2 else ''
         c2_str = str(count_val2) if (count_val2 is not None and str(count_val2).strip() != '') else ''
         t2_str = format_currency_str(total_val2) if total_val2 else ''
+
+        # 中央仕切り罫線
+        for c in range(col_bf, col_dn + 1):
+            cell_top = ws.cell(row=mid_r - 1, column=c)
+            cell_top.border = openpyxl.styles.Border(
+                top=thin if mid_r - 1 == start_r else None,
+                bottom=thin,
+                left=thin if c == col_bf else None,
+                right=thin if c == col_dn else None
+            )
 
         # 上段
         ws.merge_cells(start_row=start_r, start_column=c_p_start, end_row=mid_r-1, end_column=c_p_end)
@@ -586,47 +630,6 @@ def get_image_anchors(ws):
     return image_coords
 
 
-def extract_header_box_digits(ws, label_keyword_or_row):
-    """spotlogの見出し（公費負担者番号、公費受給者番号、区市町村番号、受給者番号）から数字列を動的抽出"""
-    if isinstance(label_keyword_or_row, int):
-        target_row = label_keyword_or_row
-    else:
-        target_row = None
-        for r in range(5, 35):
-            for c in range(1, 15):
-                v = str(ws.cell(r, c).value or '').replace(' ', '').replace('　', '')
-                if label_keyword_or_row == '受給者番号':
-                    if '受給者番号' in v and '公費' not in v:
-                        target_row = r
-                        break
-                elif str(label_keyword_or_row) in v:
-                    target_row = r
-                    break
-            if target_row: break
-            
-    if not target_row: return []
-    
-    digits = []
-    # 保険者番号（列AP以降）を拾わないよう列14〜38に限定
-    for c in range(14, 38):
-        v = ws.cell(row=target_row, column=c).value
-        if v is not None and str(v).strip().isdigit():
-            digits.append(str(v).strip())
-    return digits
-
-
-def fill_header_boxes(target_ws, target_row, digits):
-    """基準様式の8マスヘッダー欄へ右詰めで数値を入力"""
-    box_cols = ['AF', 'AL', 'AR', 'AX', 'BD', 'BJ', 'BP', 'BV']
-    for col in box_cols:
-        target_ws[f"{col}{target_row}"] = None
-    if digits:
-        digs = digits[-len(box_cols):] if len(digits) > len(box_cols) else digits
-        start_idx = len(box_cols) - len(digs)
-        for i, d in enumerate(digs):
-            cell = target_ws[f"{box_cols[start_idx + i]}{target_row}"]
-            cell.value = str(d)
-            cell.alignment = Alignment(horizontal="center", vertical="center")
 
 
 def detect_special_marks(ws, img_coords):
@@ -1416,9 +1419,12 @@ def extract_middle_fees_dynamic(spot_ws):
             if '通所' in v and 'tuusho' not in fees:
                 u_row = parse_fee_row_smart(spot_ws, r)
                 l_row = {'price': None, 'count': None, 'total': None}
-                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 7)):
+                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 5)):
+                    ro_text = str(spot_ws.cell(row=ro, column=c).value or '')
+                    if any(k in ro_text for k in ['訪問', '温罨法', '電療', '特別地域', '変形', '往療']):
+                        break
                     parsed = parse_fee_row_smart(spot_ws, ro)
-                    if parsed['price'] is not None or (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
+                    if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
                 fees['tuusho'] = {
@@ -1432,9 +1438,12 @@ def extract_middle_fees_dynamic(spot_ws):
             elif ('訪問施術料１' in v or '訪問施術料1' in v) and 'h1' not in fees:
                 u_row = parse_fee_row_smart(spot_ws, r)
                 l_row = {'price': None, 'count': None, 'total': None}
-                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 7)):
+                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 5)):
+                    ro_text = str(spot_ws.cell(row=ro, column=c).value or '')
+                    if any(k in ro_text for k in ['訪問施術料２', '訪問施術料2', '訪問施術料３', '訪問施術料3', '温罨法', '電療', '特別地域', '変形', '往療']):
+                        break
                     parsed = parse_fee_row_smart(spot_ws, ro)
-                    if parsed['price'] is not None or (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
+                    if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
                 fees['h1'] = {
@@ -1448,9 +1457,12 @@ def extract_middle_fees_dynamic(spot_ws):
             elif ('訪問施術料２' in v or '訪問施術料2' in v) and 'h2' not in fees:
                 u_row = parse_fee_row_smart(spot_ws, r)
                 l_row = {'price': None, 'count': None, 'total': None}
-                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 7)):
+                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 5)):
+                    ro_text = str(spot_ws.cell(row=ro, column=c).value or '')
+                    if any(k in ro_text for k in ['訪問施術料３', '訪問施術料3', '温罨法', '電療', '特別地域', '変形', '往療']):
+                        break
                     parsed = parse_fee_row_smart(spot_ws, ro)
-                    if parsed['price'] is not None or (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
+                    if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
                 fees['h2'] = {
@@ -1464,9 +1476,12 @@ def extract_middle_fees_dynamic(spot_ws):
             elif ('訪問施術料３' in v or '訪問施術料3' in v) and 'h3' not in fees:
                 u_row = parse_fee_row_smart(spot_ws, r)
                 l_row = {'price': None, 'count': None, 'total': None}
-                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 7)):
+                for ro in range(r + 1, min(spot_ws.max_row + 1, r + 5)):
+                    ro_text = str(spot_ws.cell(row=ro, column=c).value or '')
+                    if any(k in ro_text for k in ['温罨法', '電療', '特別地域', '変形', '往療']):
+                        break
                     parsed = parse_fee_row_smart(spot_ws, ro)
-                    if parsed['price'] is not None or (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
+                    if (parsed['total'] is not None and parsed['total'] > 0) or (parsed['count'] is not None and parsed['count'] > 0):
                         l_row = parsed
                         break
                 fees['h3'] = {
